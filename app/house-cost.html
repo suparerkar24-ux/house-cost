@@ -790,6 +790,14 @@ body:not([data-tab="list"]) #hmTitle::after{content:"";display:inline-block;widt
 .pdfpage .fl td{padding:3px 2px;border-bottom:1px solid #eee;font-size:13px}
 .pdfpage .ok{color:#1c7547;font-weight:600}.pdfpage .bad{color:#b03434;font-weight:600}
 .pdfpage .foot{margin-top:18px}
+
+/* compact tab bar */
+.tabs{transition:height .25s ease,width .25s ease,bottom .25s ease,padding .25s ease,background .25s}
+.tabs button{transition:font-size .2s,gap .2s}
+.tabs button svg{transition:width .2s,height .2s}
+body.tb-mini .tabs{height:40px;width:min(220px,calc(100% - 140px));bottom:calc(4px + env(safe-area-inset-bottom, 0px));padding:3px!important;background:rgba(38,40,43,.92)}
+body.tb-mini .tabs button{font-size:0!important;gap:0!important}
+body.tb-mini .tabs button svg{width:18px;height:18px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -1553,14 +1561,16 @@ function cvFitEdge(p,q){
   if(hits.length<12)return null;
   const mx=hits.reduce((s,p)=>s+p[0],0)/hits.length,my=hits.reduce((s,p)=>s+p[1],0)/hits.length;
   let sxx=0,syy=0,sxy=0;hits.forEach(([x,y])=>{sxx+=(x-mx)**2;syy+=(y-my)**2;sxy+=(x-mx)*(y-my)});
-  const th=.5*Math.atan2(2*sxy,sxx-syy);return {c:[mx,my],d:[Math.cos(th),Math.sin(th)],W,H};
+  const th=.5*Math.atan2(2*sxy,sxx-syy),dx=Math.cos(th),dy=Math.sin(th);
+  if(Math.abs(dx*uy-dy*ux)>.14)return null; // fitted line runs another way: not this side
+  return {c:[mx,my],d:[dx,dy],W,H};
 }
-function cvCornerAt(A,i){
+function cvCornerAt(A,i,tight){
   const n=A.length;if(n<3||!SNAP.ink)return null;
   const L1=cvFitEdge(A[(i-1+n)%n],A[i]),L2=cvFitEdge(A[i],A[(i+1)%n]);if(!L1||!L2)return null;
   const d=L1.d[0]*L2.d[1]-L1.d[1]*L2.d[0];if(Math.abs(d)<.2)return null;
   const t=((L2.c[0]-L1.c[0])*L2.d[1]-(L2.c[1]-L1.c[1])*L2.d[0])/d,x=L1.c[0]+t*L1.d[0],y=L1.c[1]+t*L1.d[1];
-  const W=L1.W,H=L1.H,lim=Math.max(Math.min(W,H)*.035,34*LASTV.upu*H/1000);if(Math.hypot(x-A[i][0]*W,y-A[i][1]*H)>lim)return null;
+  const W=L1.W,H=L1.H,lim=tight?Math.min(W,H)*.015:Math.max(Math.min(W,H)*.035,34*LASTV.upu*H/1000);if(Math.hypot(x-A[i][0]*W,y-A[i][1]*H)>lim)return null;
   return [x/W,y/H];
 }
 function snapPin(A,i){return cvCornerAt(A,i)||snapFind(A[i])}
@@ -1601,18 +1611,31 @@ function cvParcel(){
     R.push({id,area,x0,y0,x1,y1,edge})}
   const md=Math.min(W,H);
   let C=R.filter(r=>!r.edge&&r.area>N*.004&&r.area<N*.35&&Math.min(r.x1-r.x0,r.y1-r.y0)>md*.06&&r.area/((r.x1-r.x0+1)*(r.y1-r.y0+1))>.35);
+  const C0=C.slice();
   // a frame that holds another candidate inside it is not the parcel
   C=C.filter(a=>!C.some(b=>b!==a&&b.x0>=a.x0&&b.x1<=a.x1&&b.y0>=a.y0&&b.y1<=a.y1&&b.area>a.area*.12));
-  let best=null,bs=0;
-  for(const r of C){
+  // shapes that touch each other form a group (the map box, a table). Neighbouring plots touch the group's
+  // outer edge; the plot itself sits inside. Table cells come in identical copies.
+  const par=C.map((_,i)=>i),fnd=i=>par[i]===i?i:(par[i]=fnd(par[i])),gap=8;
+  for(let i=0;i<C.length;i++)for(let j=i+1;j<C.length;j++){const a=C[i],b=C[j];
+    if(a.x0-gap<=b.x1&&b.x0-gap<=a.x1&&a.y0-gap<=b.y1&&b.y0-gap<=a.y1)par[fnd(i)]=fnd(j)}
+  const GB={};C.forEach((r,i)=>{const g=fnd(i),q=GB[g]||(GB[g]={x0:W,y0:H,x1:0,y1:0,n:0});q.x0=Math.min(q.x0,r.x0);q.y0=Math.min(q.y0,r.y0);q.x1=Math.max(q.x1,r.x1);q.y1=Math.max(q.y1,r.y1);q.n++});
+  const near=(a,b)=>Math.abs(a-b)<=Math.max(a,b)*.06;
+  let best=null,bs=0,second=0;
+  for(let ci=0;ci<C.length;ci++){const r=C[ci];
     const pts=[];for(let y=r.y0;y<=r.y1;y++)for(let x=r.x0;x<=r.x1;x++)if(lab[y*W+x]===r.id)pts.push([x,y]);
     const hull=cvHull(pts),ha=cvArea(hull),sol=r.area/(ha||1);if(sol<.8)continue;
     const Q=cvSimplify(hull);
     const axis=Q.length===4&&Q.every((p,i)=>{const q=Q[(i+1)%4],a=Math.abs(Math.atan2(q[1]-p[1],q[0]-p[0]))*180/Math.PI;return Math.min(a%90,90-a%90)<2.5});
-    const sc=r.area*sol*(axis?.35:1);
-    if(sc>bs){bs=sc;best=Q}
+    const gb=GB[fnd(ci)],m=6,inside=gb.n<2||(r.x0-gb.x0>m&&gb.x1-r.x1>m&&r.y0-gb.y0>m&&gb.y1-r.y1>m);
+    const twin=C.some((o,j)=>j!==ci&&near(o.area,r.area)&&near(o.x1-o.x0,r.x1-r.x0)&&near(o.y1-o.y0,r.y1-r.y0));
+    const sc=r.area*sol*(axis?.5:1)*(inside?1:.15)*(twin?.2:1);
+    if(Q.length<3||Q.length>8)continue;
+    if(axis&&gb.n<2)continue; // a lone upright box is a frame or a stamp, not a sure plot
+    if(sc>bs){second=bs;bs=sc;best=Q}else if(sc>second)second=sc;
   }
-  if(!best)return null;
+  // two look-alike shapes (table cells, boxes) means we cannot tell which one is the plot
+  if(!best||second>bs*.6)return null;
   // pull the vertices out to the middle of the drawn line, then onto line corners when close
   const cx=best.reduce((a,p)=>a+p[0],0)/best.length,cy=best.reduce((a,p)=>a+p[1],0)/best.length;
   return best.map(([x,y])=>{const dx=x-cx,dy=y-cy,L=Math.hypot(dx,dy)||1;return[(x+dx/L*2+.5)/W,(y+dy/L*2+.5)/H]});
@@ -1659,10 +1682,10 @@ async function autoFlatten(){
 }
 async function localDetect(fromUpload){
   let Q=null;try{Q=cvParcel()}catch(e){Q=null}
-  if(!Q||Q.length<3){if(!fromUpload)plotMsg('หากรอบที่ดินในรูปไม่เจอ กด “วาดกรอบเอง” แล้วแตะมุมที่ดินทีละจุด','err');return 0}
+  if(!Q||Q.length<3){plotMsg('หากรอบที่ดินในรูปไม่ชัด แตะมุมที่ดินบนรูปเองทีละจุด เรียงรอบแปลง แล้วกด “เสร็จ”','err');return 0}
   if(!SNAP.pts||!SNAP.ink){try{const G=cvGray($('stageImg'),1000),ink=cvInk(G);SNAP.ink={m:ink,W:G.W,H:G.H};SNAP.pts=cvCorners(ink,G.W,G.H);SNAP.src=$('stageImg').getAttribute('src')}catch(e){}}
   const ar=S.plot.ar||1;LASTV={W:1000*ar,H:1000,upu:Math.max(LASTV.upu,1.2)};
-  for(let k=0;k<2;k++)Q=Q.map((p,i)=>cvCornerAt(Q,i)||p);
+  Q=Q.map((p,i)=>cvCornerAt(Q,i,true)||p);
   S.plot.aOk=false;S.plot.pts=Q;S.plot.labels=Q.map(()=>'');S.plot.meas=Q.map(()=>'');S.plot.sides=Q.map(()=>({t:'land',w:'',open:true}));S.fenceSides=[];
   vmode='deed';update();
   plotMsg(`จับหมุดจากเส้นในรูปได้ ${Q.length} หมุด เช็กว่าตรงมุมแปลงไหม ถ้าไม่ตรงกด “แก้หมุด” แล้วลากหมุดไปวางเอง · เลือกด้านที่ติดถนนในรายการด้านล่าง`,'ok');
@@ -1695,6 +1718,7 @@ function setZoomed(k,on){const el=k==='stage'?$('stage'):$('planWrap');if(el)el.
 function rerenderView(k){if(k==='stage')renderStage();else window.__renderPlot&&window.__renderPlot()}
 function zoomBy(k,f,cx,cy){ // cx,cy: focus as fraction of current view (0..1)
   const v=VIEW[k],base=BASE[k];if(!base)return;
+  if(k==='stage'&&f<1&&v.z<=1.001&&zoomPlot&&(S.plot.pts||[]).length>=3){zoomPlot=false;VIEW.stage={z:1,ox:0,oy:0};rerenderView(k);return}
   const z0=v.z,z1=Math.max(1,Math.min(8,z0*f));if(z1===z0)return;
   const [bx,by,bw,bh]=base,w0=bw/z0,h0=bh/z0,w1=bw/z1,h1=bh/z1;
   const fx=cx??.5,fy=cy??.5;
@@ -1705,7 +1729,7 @@ function zoomBy(k,f,cx,cy){ // cx,cy: focus as fraction of current view (0..1)
   rerenderView(k);
 }
 function panBy(k,dxPx,dyPx,el){const v=VIEW[k],base=BASE[k];if(!base||v.z<=1)return;const upp=(base[2]/v.z)/(el.clientWidth||1);v.ox-=dxPx*upp;v.oy-=dyPx*upp;rerenderView(k)}
-function resetView(k){VIEW[k]={z:1,ox:0,oy:0};rerenderView(k)}
+function resetView(k){VIEW[k]={z:1,ox:0,oy:0};if(k==='stage')zoomPlot=false;rerenderView(k)}
 function loupe([px,py],vb,upu){
   const R=46*upu,mag=3,gap=34*upu;let lx=px,ly=py-R-gap;
   if(ly-R<vb[1]) ly=py+R+gap;
@@ -2274,7 +2298,7 @@ window.__uploadFlow=async f=>{
     const url=c.toDataURL('image/jpeg',0.85);
     window.__resetWarp&&window.__resetWarp();
     S.plot={ar:c.width/c.height,pts:[],labels:[],meas:[],sides:[]};S.fenceSides=[];corners=[];
-    vmode='deed';zoomPlot=true;VIEW.stage={z:1,ox:0,oy:0};VIEW.plan={z:1,ox:0,oy:0};hiSide=-1;openSide=-1;
+    vmode='deed';zoomPlot=false;VIEW.stage={z:1,ox:0,oy:0};VIEW.plan={z:1,ox:0,oy:0};hiSide=-1;openSide=-1;
     deedBlob=dataUrlToBlob(url);showDeed(url);
     try{localStorage.setItem(DEED_KEY,url)}catch(e){}
     update();
@@ -3245,6 +3269,20 @@ $('shPdf').onclick=()=>makePdf($('shPdf'));
   b.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9.5 14.5L12 17l2.5-2.5"/></svg>บันทึกเป็น PDF';
   const m=document.createElement('p');m.className='hm-note';m.id='pdfNote';m.setAttribute('aria-live','polite');
   pc.appendChild(b);pc.appendChild(m);b.onclick=()=>makePdf(b)})();
+
+// ---------- tab bar shrinks while scrolling down ----------
+(function(){
+  let lastY=scrollY,acc=0;
+  const mini=on=>document.body.classList.toggle('tb-mini',on);
+  addEventListener('scroll',()=>{
+    const y=scrollY,d=y-lastY;lastY=y;
+    if(document.body.classList.contains('sh-open'))return;
+    if(y<40||innerHeight+y>=document.documentElement.scrollHeight-4){mini(false);acc=0;return}
+    if(d>0){acc=Math.max(0,acc)+d;if(acc>28)mini(true)}else if(d<0){acc=Math.min(0,acc)+d;if(acc<-18)mini(false)}
+  },{passive:true});
+  // tapping the small bar switches the tab and opens the bar again
+  $('tabs').addEventListener('click',()=>{acc=0;mini(false)},true);
+})();
 
 // ---------- name / rename ----------
 let nmNew=false;
