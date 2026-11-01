@@ -751,6 +751,8 @@ body:not([data-tab="list"]) #hmTitle::after{content:"";display:inline-block;widt
 /* PDF report (rendered off screen, light paper look) */
 .choice .tip{margin-top:6px;font-size:13px;color:var(--lock)}
 .up-tip{margin:8px 0 0;font-size:13px;color:var(--lock)}
+.gate-price{margin-top:12px}
+.gate-price .hint{display:block;font-size:13px;color:var(--muted)}
 .hm-pdf{width:100%;min-height:52px!important;margin-top:4px;gap:8px;font-size:16px!important}
 .pdfhost{position:fixed;left:-12000px;top:0;z-index:-1}
 .pdfpage{width:794px;height:1123px;overflow:hidden;background:#fff;color:#16181a;font-family:var(--body);font-size:14px;line-height:1.45;padding:44px 48px;box-sizing:border-box;
@@ -883,6 +885,17 @@ body.tb-mini .tabs button svg{width:18px;height:18px}
           <span class="inp"><input id="apprBuild" inputmode="decimal" autocomplete="off"><span>บาท/ตร.ม.</span></span>
         </label>
         <div class="gainline" id="buildGain"></div>
+        <label class="f" id="apprGarWrap">ราคาประเมินโรงรถคาดการณ์
+          <span class="inp"><input id="apprGar" inputmode="decimal" autocomplete="off"><span>บาท/ตร.ม.</span></span>
+        </label>
+        <label class="f" id="apprGarUWrap" hidden>ราคาประเมินโรงรถใต้ชั้น 2 คาดการณ์
+          <span class="inp"><input id="apprGarU" inputmode="decimal" autocomplete="off"><span>บาท/ตร.ม.</span></span>
+        </label>
+        <div class="gainline" id="garGain"></div>
+        <label class="f">ราคาประเมินครัวคาดการณ์
+          <span class="inp"><input id="apprKit" inputmode="decimal" autocomplete="off"><span>บาท/ตร.ม.</span></span>
+        </label>
+        <div class="gainline" id="kitGain"></div>
         <div class="result main" id="resAppr">
           <span class="lbl" id="apprSumLbl">ราคาประเมินรวม − ต้นทุนรวม</span>
           <span class="big num" id="diffAppr">0</span>
@@ -998,7 +1011,7 @@ const DEFAULTS={
   paper:{w:31,h:43},
   fenceSides:[], gate:4,
   layers:{img:true,frame:true,len:true,setback:true,build:true,road:true,pins:true,scale:true},
-  other:30000, sale:2200000, apprLand:12000, apprBuildRate:18000,
+  other:30000, sale:2200000, apprLand:12000, apprBuildRate:18000, apprGarRate:5000, apprGarURate:15000, apprKitRate:8000, gatePrice:0,
   site:{side:0,w:null,face:'d',gar:'auto'},
   plan:{floors:2,bed:3,bath:2,living:1,dining:1,kitchenIn:1}
 };
@@ -1207,8 +1220,9 @@ const $=id=>document.getElementById(id);
 
 function landCost(){return S.land.price}
 const garUnder=()=>!!(S.garage.under&&S.plan.floors>=2);
+function apprParts(){const land=S.apprLand*S.land.wa,house=S.house.area*S.apprBuildRate,garage=S.garage.area*(garUnder()?S.apprGarURate:S.apprGarRate),kitchen=S.kitchen.area*S.apprKitRate;return {land,house,garage,kitchen,total:land+house+garage+kitchen}}
 const houseRate=()=>S.house.lock?(S.house.area?S.house.fixed/S.house.area:S.house.rate):S.house.rate;
-function itemCost(k){const o=S[k];if(o.lock)return o.fixed;if(k==='garage'&&garUnder())return o.area*houseRate();return o.area*o.rate}
+function itemCost(k){const o=S[k];if(k==='fence')return (o.lock?o.fixed:o.area*o.rate)+(+S.gatePrice||0);if(o.lock)return o.fixed;if(k==='garage'&&garUnder())return o.area*houseRate();return o.area*o.rate}
 
 // bind money inputs: format on blur, update on input
 function bindMoney(id,get,set,f=fmt){
@@ -1223,6 +1237,9 @@ bindMoney('other',()=>S.other,v=>S.other=v);
 bindMoney('sale',()=>S.sale,v=>S.sale=v);
 bindMoney('apprLand',()=>S.apprLand,v=>S.apprLand=v);
 bindMoney('apprBuild',()=>S.apprBuildRate,v=>S.apprBuildRate=v);
+bindMoney('apprGar',()=>S.apprGarRate,v=>S.apprGarRate=v);
+bindMoney('apprGarU',()=>S.apprGarURate,v=>S.apprGarURate=v);
+bindMoney('apprKit',()=>S.apprKitRate,v=>S.apprKitRate=v);
 ITEMS.forEach(it=>{
   bindMoney(it.k+'-rate',()=>S[it.k].rate,v=>S[it.k].rate=v);
   bindMoney(it.k+'-fixed',()=>S[it.k].fixed,v=>S[it.k].fixed=v);
@@ -1279,7 +1296,7 @@ function normalize(x){
 }
 function syncInputs(){
   $('land-wa').value=fmtWa(S.land.wa);$('land-price').value=fmt(S.land.price);
-  $('other').value=fmt(S.other);$('sale').value=fmt(S.sale);$('apprLand').value=fmt(S.apprLand);$('apprBuild').value=fmt(S.apprBuildRate);
+  $('other').value=fmt(S.other);$('sale').value=fmt(S.sale);$('apprLand').value=fmt(S.apprLand);$('apprBuild').value=fmt(S.apprBuildRate);$('apprGar').value=fmt(S.apprGarRate);$('apprGarU').value=fmt(S.apprGarURate);$('apprKit').value=fmt(S.apprKitRate);if($('gatePrice'))$('gatePrice').value=fmt(S.gatePrice||0);
   ITEMS.forEach(it=>{$(it.k+'-rate').value=fmt(S[it.k].rate);$(it.k+'-fixed').value=fmt(S[it.k].fixed);$(it.k+'-range').value=S[it.k].area});
 }
 
@@ -1346,6 +1363,7 @@ function update(){
     $(it.k+'-sub').textContent=fmt(c)+' บาท';
   });
   if(garUnder()&&!S.garage.lock){$('garage-how').innerHTML=`${S.garage.area} ตร.ม. × ${fmt(houseRate())} บาท <b style="color:var(--accent)">ราคาตัวบ้าน (ใต้ชั้น 2)</b>`}
+  if((+S.gatePrice||0)>0){const fo=S.fence;$('fence-how').innerHTML=(fo.lock?`<b>ล็อกไว้</b> ${fmt(fo.fixed)}`:`${fo.area} ม. × ${fmt(fo.rate)} บาท`)+` + ประตูเหล็ก ${fmt(S.gatePrice)} บาท`}
   if($('garUnder')){$('garUnder').checked=!!S.garage.under;$('garUnder').disabled=S.plan.floors<2;$('garUnderHint').textContent=S.plan.floors<2?'ใช้ได้เมื่อบ้าน 2 ชั้นขึ้นไป':'ค่าก่อสร้างคิดเท่าตัวบ้าน และวางชิดตัวบ้าน'}
   const PG=plotGeom();
   const perim=PG?Math.round(PG.perimUse):Math.round(4*Math.sqrt(S.land.wa*4));
@@ -1359,11 +1377,14 @@ function update(){
   $('bar').innerHTML=parts.map(([k,,c])=>`<i style="width:${total?costs[k]/total*100:0}%;background:var(${c})"></i>`).join('');
   $('legend').innerHTML=parts.map(([k,l,c])=>`<div><span class="swatch" style="background:var(${c})"></span><span>${l}${S[k]&&S[k].lock?'<span class="lk">ล็อก</span>':''}</span><span class="num">${fmt(costs[k])}</span><span class="pct num">${total?Math.round(costs[k]/total*100):0}%</span></div>`).join('');
 
-  const apprLandTotal=S.apprLand*S.land.wa, apprBuildTotal=S.house.area*S.apprBuildRate, apprTotal=apprLandTotal+apprBuildTotal;
-  const buildCost=total-lc, gl=apprLandTotal-lc, gb=apprBuildTotal-buildCost;
+  const AP=apprParts(),apprLandTotal=AP.land, apprBuildTotal=AP.house, apprTotal=AP.total;
+  const buildCost=costs.house, gl=apprLandTotal-lc, gb=apprBuildTotal-buildCost;
   const gl_=(a,b,d)=>`<span>${a} ${fmt(b)}</span><b class="${d>=0?'g':'l'}">${signed(d)}</b>`;
   $('landGain').innerHTML=gl_(`${fmt(S.land.wa)} ตร.วา = ประเมิน ${fmt(apprLandTotal)} · ทุนที่ดิน`,lc,gl);
-  $('buildGain').innerHTML=gl_(`บ้าน ${S.house.area} ตร.ม. = ประเมิน ${fmt(apprBuildTotal)} · ทุนก่อสร้าง+อื่นๆ`,buildCost,gb);
+  $('buildGain').innerHTML=gl_(`บ้าน ${S.house.area} ตร.ม. = ประเมิน ${fmt(apprBuildTotal)} · ทุนตัวบ้าน`,buildCost,gb);
+  const gu=garUnder();$('apprGarWrap').hidden=gu;$('apprGarUWrap').hidden=!gu;
+  $('garGain').innerHTML=S.garage.area>0?gl_(`โรงรถ${gu?'ใต้ชั้น 2':''} ${fmt1(S.garage.area)} ตร.ม. = ประเมิน ${fmt(AP.garage)} · ทุนโรงรถ`,costs.garage,AP.garage-costs.garage):'<span>ไม่มีโรงรถ</span>';
+  $('kitGain').innerHTML=S.kitchen.area>0?gl_(`ครัว ${fmt1(S.kitchen.area)} ตร.ม. = ประเมิน ${fmt(AP.kitchen)} · ทุนครัว`,costs.kitchen,AP.kitchen-costs.kitchen):'<span>ไม่มีครัว</span>';
   $('apprSumLbl').textContent=`ราคาประเมินรวม ${fmt(apprTotal)} − ต้นทุนรวม ${fmt(total)}`;
   const dA=apprTotal-total, dS=S.sale-total;
   LAST={total,diff:dA};
@@ -3183,6 +3204,12 @@ window.addEventListener('hashchange',readHash);
 setTimeout(readHash,0);
 sampleReady.then(()=>{if(!canReadImg){const d=document.querySelector('#chUpload .cd');if(d)d.textContent='ระบบหาหมุดจากเส้นในรูปให้ แก้เองได้'}});
 
+// steel gate price in the fence card
+(function(){const c=$('card-fence');if(!c)return;const f=c.querySelector('.foot');
+  const l=document.createElement('label');l.className='f gate-price';
+  l.innerHTML='ค่าประตูเหล็ก<span class="inp"><input id="gatePrice" inputmode="decimal" autocomplete="off"><span>บาท</span></span><span class="hint">ราคาเหมาทั้งบาน รวมติดตั้ง บวกเพิ่มจากค่ารั้ว</span>';
+  c.insertBefore(l,f);bindMoney('gatePrice',()=>S.gatePrice||0,v=>S.gatePrice=v);$('gatePrice').value=fmt(S.gatePrice||0)})();
+
 // garage under the upper floor
 (function(){const c=$('card-garage');if(!c)return;const f=c.querySelector('.foot');
   const l=document.createElement('label');l.className='eg-chk gar-under';
@@ -3196,8 +3223,8 @@ async function svgUrl(svg,w){try{if(!svg||!svg.viewBox.baseVal||!svg.viewBox.bas
 function pdfPages(img){
   const name=$('projName').value.trim()||('บ้าน '+fmt1(S.land.wa)+' ตร.วา');
   const today=new Date().toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'});
-  const lc=landCost(),costs=[['ที่ดิน',lc,'--c-land'],['ตัวบ้าน',itemCost('house'),'--c-house'],[garUnder()?'โรงรถ (ใต้ชั้น 2)':'หลังคาโรงรถ',itemCost('garage'),'--c-garage'],['ครัว',itemCost('kitchen'),'--c-kitchen'],['รั้ว',itemCost('fence'),'--c-fence'],['ค่าอื่นๆ',S.other,'--c-other']];
-  const total=costs.reduce((a,c)=>a+(+c[1]||0),0),aL=S.apprLand*S.land.wa,aB=S.house.area*S.apprBuildRate,aT=aL+aB,dA=aT-total,dS=S.sale-total;
+  const lc=landCost(),costs=[['ที่ดิน',lc,'--c-land'],['ตัวบ้าน',itemCost('house'),'--c-house'],[garUnder()?'โรงรถ (ใต้ชั้น 2)':'หลังคาโรงรถ',itemCost('garage'),'--c-garage'],['ครัว',itemCost('kitchen'),'--c-kitchen'],[(+S.gatePrice||0)>0?'รั้ว + ประตูเหล็ก':'รั้ว',itemCost('fence'),'--c-fence'],['ค่าอื่นๆ',S.other,'--c-other']];
+  const total=costs.reduce((a,c)=>a+(+c[1]||0),0),AP=apprParts(),aL=AP.land,aB=AP.house,aT=AP.total,dA=aT-total,dS=S.sale-total;
   const cv=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   const sg=(d)=>`<b class="${d>=0?'g':'l'}">${d>=0?'+':'−'}${fmt(Math.abs(d))}</b>`;
   const head=(t,n)=>`<div class="ph"><div><div class="pt">${esc2(name)}</div><div class="ps">${t}</div></div><div class="pn">หน้า ${n}/3 · ${today}</div></div>`;
@@ -3223,6 +3250,8 @@ function pdfPages(img){
     <h3>ราคาประเมิน</h3><table class="t">
       <tr><td>ที่ดิน ${fmt(S.apprLand)} บาท/ตร.วา</td><td class="r">${fmt(aL)}</td></tr>
       <tr><td>ตัวบ้าน ${fmt(S.apprBuildRate)} บาท/ตร.ม.</td><td class="r">${fmt(aB)}</td></tr>
+      ${S.garage.area>0?`<tr><td>โรงรถ${garUnder()?'ใต้ชั้น 2':''} ${fmt(garUnder()?S.apprGarURate:S.apprGarRate)} บาท/ตร.ม.</td><td class="r">${fmt(AP.garage)}</td></tr>`:''}
+      ${S.kitchen.area>0?`<tr><td>ครัว ${fmt(S.apprKitRate)} บาท/ตร.ม.</td><td class="r">${fmt(AP.kitchen)}</td></tr>`:''}
       <tr class="sum"><td>ราคาประเมินรวม</td><td class="r">${fmt(aT)}</td></tr>
     </table>`;
   const p2=`${head('ที่ดินและระยะร่น',2)}
