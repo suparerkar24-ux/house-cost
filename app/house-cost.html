@@ -835,6 +835,17 @@ body.tb-mini .tabs button svg{width:18px;height:18px}
 .apz .result:not(.main) .lbl{grid-column:1/-1;font-size:13px}
 .apz .result:not(.main) .big{font-size:22px}
 .apz .result:not(.main) .pctline{font-size:13px;font-weight:600}
+
+/* house position */
+.pos-l{font-size:14px;color:var(--muted);margin-top:4px}
+.pos-in{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px}
+.pos-in[hidden]{display:none}
+.pos-in .apz-in input{width:5.5em}
+.pos-min{display:block;font-size:12.5px;color:var(--muted)}
+.pos-now{margin:2px 0 0;font-size:13.5px;color:var(--muted)}
+.pos-now b{color:var(--fg)}
+.pos-now .w{color:var(--lock)}
+#posAlign button{padding:0 6px;font-size:14px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -2491,6 +2502,15 @@ $('wheel').addEventListener('keydown',e=>{if(e.key!=='Tab')return;const f=[$('wh
     <div class="site-msg" id="siteMsg" role="status" aria-live="polite"></div>
     <div class="sec"><span class="qlabel">ให้บ้านขนานกับด้านไหน</span><div class="side-chips" id="siteSides" role="radiogroup" aria-label="ขนานกับด้าน"></div></div>
     <div class="sec"><span class="qlabel">หน้าบ้านหันไปทางไหน <span class="hint">โรงรถอยู่ฝั่งหน้า ครัวอยู่ฝั่งหลัง ผังจะหมุนให้หน้าบ้านอยู่ล่างเสมอ</span></span><div class="side-chips" id="siteFace" role="radiogroup" aria-label="หน้าบ้านหันไปทาง"></div></div>
+    <div class="sec" id="sitePos"><span class="qlabel">ตำแหน่งตัวบ้าน</span>
+      <div class="pos-l">ห่างจากถนน (ด้านหน้า)</div>
+      <div class="seg" id="posFrontSeg" role="group" aria-label="ระยะจากถนน"><button type="button" data-v="auto">ชิดระยะร่น</button><button type="button" data-v="set">กำหนดระยะเอง</button></div>
+      <label class="pos-in" id="posFrontRow" hidden><span>ห่างจากเขตที่ดินฝั่งถนน<small class="pos-min" id="posFrontMin"></small></span><span class="apz-in"><input id="posFront" inputmode="decimal" autocomplete="off" placeholder="0.00"><span>ม.</span></span></label>
+      <div class="pos-l">ด้านข้าง</div>
+      <div class="seg" id="posAlign" role="group" aria-label="ด้านข้าง"></div>
+      <label class="pos-in" id="posOffRow" hidden><span><span id="posOffLbl">ห่างจากเขต</span><small class="pos-min" id="posOffMin"></small></span><span class="apz-in"><input id="posOff" inputmode="decimal" autocomplete="off" placeholder="ชิดระยะร่น"><span>ม.</span></span></label>
+      <p class="pos-now" id="posNow"></p>
+    </div>
     <div class="sec"><span class="qlabel">โรงรถอยู่ตรงไหน</span>
       <div class="seg" id="siteGar" role="radiogroup" aria-label="ตำแหน่งโรงรถ"><button type="button" data-v="auto">ให้ระบบเลือก</button><button type="button" data-v="front">หน้าบ้าน</button><button type="button" data-v="side">ข้างบ้าน</button></div></div>
     <div class="sec"><span class="fp-line" id="siteFp"></span>
@@ -2519,6 +2539,50 @@ function siteFrame(G,BU){
   const RI={d:ROT.d,u:ROT.u,l:ROT.r,r:ROT.l}[f];
   const fromW=w=>{const L=RI(w);return [a[0]+L[0]*u[0]+L[1]*inn[0],a[1]+L[0]*u[1]+L[1]*inn[1]]};
   return {si,f,toW:p=>rot(toL(p)),fromW,faceSide};
+}
+
+// ---------- house position controls ----------
+function sideAt(landW,y,which){ // land side letter met when going left/right at depth y
+  let best=null,bx=which==='l'?Infinity:-Infinity;
+  for(let i=0;i<landW.length;i++){const [x1,y1]=landW[i],[x2,y2]=landW[(i+1)%landW.length];
+    if((y1<=y&&y2>=y)||(y2<=y&&y1>=y)){const x=Math.abs(y2-y1)<1e-9?(which==='l'?Math.min(x1,x2):Math.max(x1,x2)):x1+(y-y1)*(x2-x1)/(y2-y1);
+      if(which==='l'?x<bx:x>bx){bx=x;best=i}}}
+  return best;
+}
+function renderPos(pl,F,landW,S2,Uu,fs,labs,emit,poly){
+  const hp=pl&&pl.list.find(p=>p.k==='house');
+  const my=hp?pl.y+hp.y+hp.h/2:(Math.min(...landW.map(p=>p[1]))+Math.max(...landW.map(p=>p[1])))/2;
+  const li=sideAt(landW,my,'l'),ri=sideAt(landW,my,'r');
+  const lt=li!=null?LET(li):'ซ้าย',rt=ri!=null?LET(ri):'ขวา';
+  const minF=Math.max(0,Math.min(...poly.map(p=>p[1]))-POS.lf),Lm=landSpan(my),Bm=chord(poly,my);
+  const minL=Lm&&Bm?Math.max(0,Bm[0]-Lm[0]):0,minR=Lm&&Bm?Math.max(0,Lm[1]-Bm[1]):0,minS=(S.site.align||'c')==='l'?minL:minR;
+  $('posFrontMin').textContent=`ไม่น้อยกว่า ${sd2(minF)} ม. (ระยะร่น)`;$('posOffMin').textContent=`ราว ${sd2(minS)} ม. ขึ้นไป (ระยะร่น) · เว้นว่าง = ชิดระยะร่น`;
+  const al=S.site.align||'c';
+  const key=[lt,rt,al,S.site.front,S.site.off].join('|');
+  const box=$('sitePos');
+  if(box.dataset.k!==key){box.dataset.k=key;
+    $('posAlign').innerHTML=`<button type="button" data-v="l" aria-pressed="${al==='l'}">ชิดด้าน ${lt}</button><button type="button" data-v="c" aria-pressed="${al==='c'}">กลาง</button><button type="button" data-v="r" aria-pressed="${al==='r'}">ชิดด้าน ${rt}</button>`;
+    $('posAlign').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.site.align=b.dataset.v;if(b.dataset.v==='c')S.site.off=null;update()});
+    $('posOffRow').hidden=al==='c';$('posOffLbl').textContent=`ห่างจากเขตด้าน ${al==='l'?lt:rt}`;
+    $('posFrontSeg').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.v==='set')===(S.site.front!=null))));
+    $('posFrontRow').hidden=S.site.front==null;
+  }
+  if(document.activeElement!==$('posFront'))$('posFront').value=S.site.front!=null?S.site.front:'';
+  if(document.activeElement!==$('posOff'))$('posOff').value=S.site.off!=null?S.site.off:'';
+  if(!pl||!hp){$('posNow').textContent='';return}
+  const first=pl.list.reduce((a,b)=>a.y<=b.y?a:b),fg=pl.y-POS.lf;
+  const L=landSpan(my),hx=pl.x+hp.dx,lg=L?hx-L[0]:null,rg=L?L[1]-(hx+hp.w):null;
+  let t=`ตอนนี้: ห่างถนน <b>${sd2(fg)}</b> ม.${first.k!=='house'?' (วัดถึง'+(first.k==='garage'?'โรงรถ':'ครัว')+')':''}`;
+  if(lg!=null)t+=` · ห่างด้าน ${lt} <b>${sd2(lg)}</b> ม. · ด้าน ${rt} <b>${sd2(rg)}</b> ม.`;
+  if(POS.front!=null&&POS.front<minF-.005)t+=`<br><span class="w">น้อยกว่าระยะร่นด้านหน้า เลยวางชิดระยะร่น</span>`;
+  if(POS.off!=null&&(S.site.align||'c')!=='c'&&POS.off<minS-.005)t+=`<br><span class="w">น้อยกว่าระยะร่นด้านข้าง เลยวางชิดระยะร่น</span>`;
+  if(pl.frontMiss)t+=`<br><span class="w">ห่างถนน ${sd2(POS.front)} ม. ไม่ได้ ที่ไม่พอ เลยวางให้ใกล้ที่สุดที่วางได้</span>`;
+  if(pl.offMiss&&!(POS.off<minS-.005))t+=`<br><span class="w">ห่างด้านข้าง ${sd2(POS.off)} ม. ไม่ได้ ติดระยะร่นหรือที่ไม่พอ เลยวางให้ใกล้ที่สุด</span>`;
+  $('posNow').innerHTML=t;
+  // side gap lines at house mid depth
+  if(L){[[L[0],hx,lg,lt],[hx+hp.w,L[1],rg,rt]].forEach(([a,b,g])=>{if(g<.3)return;const p1=S2(a,my),p2=S2(b,my),pm=S2((a+b)/2,my);
+    emit(`<line class="sx-gap" x1="${p1[0]}" y1="${p1[1]}" x2="${p2[0]}" y2="${p2[1]}" stroke-width="${Uu}"/>`);
+    labs.push({x:pm[0],y:pm[1]-fs*.8,dir:[0,-1],along:[1,0],t:sd2(g)+' ม.',fs:fs*.8,cls:'sx-gapt',sw:fs/5,pri:2})})}
 }
 function chord(poly,y){
   const xs=[];for(let i=0;i<poly.length;i++){const [x1,y1]=poly[i],[x2,y2]=poly[(i+1)%poly.length];
@@ -2565,14 +2629,28 @@ function pieces(W,lay,gD0=5.5,kD0=3,floors=S.plan.floors,gWn=null){
   return {list,depth:Math.max(...list.map(p=>p.y+p.h)),fp,lay};
 }
 const DEPTHS=[[5.5,3],[5.5,2.5],[5,3],[5,2.5]];
+const POS={front:null,align:'c',off:null,lf:0,land:null};
+function landSpan(y){const c=POS.land&&chord(POS.land,y);return c||null}
 function placeOne(poly,P,only){
   const list=only?P.list.filter(p=>p.k==='house').map(p=>({...p,y:0,dx:0})):P.list,depth=only?list[0].h:P.depth;
   const ys=poly.map(p=>p[1]),y0=Math.min(...ys),y1=Math.max(...ys);
-  for(let y=y0;y<=y1-depth+1e-6;y+=0.2){
+  const start=POS.front!=null?Math.max(y0,POS.lf+POS.front):y0;
+  let r=placeFrom(poly,P,list,depth,start,y1);
+  if(!r&&start>y0+1e-6){r=placeFrom(poly,P,list,depth,y0,y1);if(r)r.frontMiss=true}
+  return r;
+}
+function placeFrom(poly,P,list,depth,ystart,y1){
+  for(let y=ystart;y<=y1-depth+1e-6;y+=0.2){
     let lo=-Infinity,hi=Infinity,ok=true,hc=null;
     for(const p of list){const I=band(poly,y+p.y,y+p.y+p.h);if(!I){ok=false;break}
       lo=Math.max(lo,I[0]-p.dx);hi=Math.min(hi,I[1]-p.dx-p.w);if(p.k==='house')hc=I}
-    if(ok&&lo<=hi+1e-6){const hw=(list.find(p=>p.k==='house')||list[0]).w,want=hc?(hc[0]+hc[1])/2-hw/2:lo;return {x:Math.min(hi,Math.max(lo,want)),y,list,depth,lay:P.lay}}
+    if(ok&&lo<=hi+1e-6){const hp=list.find(p=>p.k==='house')||list[0],hw=hp.w;let want=hc?(hc[0]+hc[1])/2-hw/2:lo,offMiss=false;
+      if(POS.align==='l'||POS.align==='r'){
+        if(POS.off==null)want=POS.align==='l'?lo:hi;
+        else{const L=landSpan(y+hp.y+hp.h/2);if(L){want=POS.align==='l'?L[0]+POS.off-hp.dx:L[1]-POS.off-hw-hp.dx}}
+      }
+      const x=Math.min(hi,Math.max(lo,want));if(Math.abs(x-want)>.05&&POS.off!=null)offMiss=true;
+      return {x,y,list,depth,lay:P.lay,offMiss}}
   }
   return null;
 }
@@ -2631,9 +2709,11 @@ window.__renderSite=()=>{
     $('siteFace').innerHTML=ord.map(k=>{const i=F.faceSide(k);return `<button type="button" class="chipbtn" role="radio" data-f="${k}" aria-pressed="${k===F.f}" aria-checked="${k===F.f}">${txt[k]} <b>${LET(i)}</b>${TYPE_SHORT[side(i).t]}</button>`}).join('');
     $('siteFace').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{S.site.face=b.dataset.f;S.site.w=null;update()})}
   const poly=BU.pts.map(F.toW),xs=poly.map(p=>p[0]),ys=poly.map(p=>p[1]);
+  const landW=G.m.map(F.toW);POS.land=landW;POS.lf=Math.min(...landW.map(p=>p[1]));
+  POS.front=S.site.front!=null&&S.site.front!==''?+S.site.front:null;POS.align=S.site.align||'c';POS.off=S.site.off!=null&&S.site.off!==''?+S.site.off:null;
   const maxW=Math.max(3.5,Math.floor((Math.max(...xs)-Math.min(...xs))*10)/10),minW=3;
   const mode=S.garage.area>0?S.site.gar:'front';
-  const key=[fp,S.garage.area,S.kitchen.area,S.site.side,F.f,mode,poly.map(p=>p.map(v=>v.toFixed(2)).join(',')).join(';')].join('|');
+  const key=[fp,S.garage.area,S.kitchen.area,S.site.side,F.f,mode,POS.front,POS.align,POS.off,poly.map(p=>p.map(v=>v.toFixed(2)).join(',')).join(';')].join('|');
   let W=S.site.w;
   if(W==null){if(siteCache.key!==key){siteCache={key,w:autoWidth(poly,minW,maxW,mode)}}W=siteCache.w??Math.min(maxW,Math.max(minW,Math.sqrt(fp/1.25)))}
   W=Math.min(maxW,Math.max(minW,W));
@@ -2709,12 +2789,14 @@ window.__renderSite=()=>{
       if(r.k==='house'&&dfs>=fs*.55)o+=`<text class="sx-d" x="${X+r.w/2}" y="${Y+r.h/2+fs*.65}" font-size="${dfs}" stroke-width="${fs/5}" text-anchor="middle" dominant-baseline="middle">${dimT}</text>`}
     else labs.push({x:X+r.w/2,y:Y+r.h/2,dir:[1,0],along:[0,1],t:names[r.k],fs:fs*.85,cls:'sx-t',sw:fs/5,pri:1});
   });
-  if(pl){const first=P.list.reduce((a,b)=>a.y<=b.y?a:b),fx=P.x+first.dx+first.w/2,yb=Math.min(...ys);
+  if(pl){const first=P.list.reduce((a,b)=>a.y<=b.y?a:b),fx=P.x+first.dx+first.w/2,yb=POS.lf;
     if(P.y-yb>0.3){const g1=S2(fx,yb),g2=S2(fx,P.y),gm=S2(fx,(yb+P.y)/2);o+=`<line class="sx-gap" x1="${g1[0]}" y1="${g1[1]}" x2="${g2[0]}" y2="${g2[1]}" stroke-width="${Uu}"/>`;labs.push({x:gm[0]+fs*1.6,y:gm[1],dir:[1,0],along:[0,1],t:sd2(P.y-yb)+' ม.',fs:fs*.8,cls:'sx-gapt',sw:fs/5,pri:2})}}
   G.m.forEach((p,i)=>{const q=G.m[(i+1)%n],a=toS(p),b=toS(q),mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
     const pi=toS([p[0]+BU.L[i].inn[0],p[1]+BU.L[i].inn[1]]),iv=[pi[0]-a[0],pi[1]-a[1]];
     const v=+(S.plot.meas||[])[i];labs.push({x:mx-iv[0]*fs*1.1,y:my-iv[1]*fs*1.1,dir:[-iv[0],-iv[1]],along:[iv[1],-iv[0]],t:`${LET(i)} · ${fmt1(v>0?v:G.lens[i])}`,fs:fs*.85,cls:'pl-t',sw:fs/6,pri:0});
     const sdi=side(i),sb=setbackFor(sdi);if(sdi.t!=='land'&&sb.d)labs.push({x:mx+iv[0]*(sb.d+fs),y:my+iv[1]*(sb.d+fs),dir:iv,along:[iv[1],-iv[0]],t:sb.short,fs:fs*.75,cls:'pl-sb',sw:fs/6,pri:1})});
+  if(pl)siteCache.lastFront=pl.y-POS.lf;
+  renderPos(pl,F,landW,S2,Uu,fs,labs,o2=>{o+=o2},poly);
   $('siteFront').textContent=deedV?`หน้าบ้านหันไปทางด้าน ${LET(F.faceSide(F.f))} · มุมมองตามโฉนด`:`▼ หน้าบ้าน (ล่างสุด) หันไปทางด้าน ${LET(F.faceSide(F.f))}`;
   document.querySelectorAll('#siteView button').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.v==='deed')===deedV)));
   labs.sort((a,b)=>a.pri-b.pri);o+=placeLabels(labs,[]);
@@ -2724,6 +2806,9 @@ $('siteW').addEventListener('input',e=>{S.site.w=+e.target.value;update()});
 $('siteD').addEventListener('input',e=>{const fp=S.house.area/S.plan.floors;S.site.w=Math.round(fp/+e.target.value*100)/100;update()});
 $('siteAuto').onclick=()=>{S.site.w=null;siteCache.key='';update()};
 document.querySelectorAll('#siteView button').forEach(b=>b.onclick=()=>{S.site.view=b.dataset.v;update()});
+document.querySelectorAll('#posFrontSeg button').forEach(b=>b.onclick=()=>{if(b.dataset.v==='set'){if(S.site.front==null)S.site.front=Math.round(((siteCache.lastFront)||0)*100)/100}else S.site.front=null;$('sitePos').dataset.k='';update();if(S.site.front!=null)setTimeout(()=>$('posFront').focus(),30)});
+$('posFront').addEventListener('input',e=>{const v=parse(e.target.value);S.site.front=e.target.value.trim()===''?0:(v>=0?v:0);update()});
+$('posOff').addEventListener('input',e=>{const v=parse(e.target.value);S.site.off=e.target.value.trim()===''||!(v>=0)?null:v;update()});
 $('siteFloors').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.plan.floors=+b.dataset.v;update()});
 $('siteGar').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.site.gar=b.dataset.v;S.site.w=null;update()});
 $('siteGoLand').onclick=()=>{typeof setTab==='function'?setTab('land',true):$('card-land').scrollIntoView()};
