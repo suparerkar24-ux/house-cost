@@ -2704,7 +2704,7 @@ matchMedia('(min-width:0px)').addEventListener('change',()=>{if(!mobile())closeS
   head.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;head.setPointerCapture(e.pointerId);start(e.clientY,false)});
   head.addEventListener('pointermove',e=>move(e.clientY));
   head.addEventListener('pointerup',end);head.addEventListener('pointercancel',end);
-  sheet.addEventListener('touchstart',e=>{if(head.contains(e.target))return;if(sheet.scrollTop<=0&&e.touches.length===1)start(e.touches[0].clientY,true)},{passive:true});
+  sheet.addEventListener('touchstart',e=>{if(!sheet.classList.contains('open')||head.contains(e.target))return;if(sheet.scrollTop<=0&&e.touches.length===1)start(e.touches[0].clientY,true)},{passive:true});
   sheet.addEventListener('touchmove',e=>{if(y0!=null&&fromBody)move(e.touches[0].clientY,e)},{passive:false});
   sheet.addEventListener('touchend',()=>{if(fromBody)end()});
 })();
