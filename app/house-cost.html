@@ -736,6 +736,17 @@ body:not([data-tab="list"]) #hmTitle::after{content:"";display:inline-block;widt
   background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h4L19 9l-4-4L4 16z'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h4L19 9l-4-4L4 16z'/%3E%3C/svg%3E") center/contain no-repeat}
 #nmSheet .inp{min-height:52px}
 #nmSheet .inp input{font-size:18px}
+
+/* front side picker + house view toggle + garage under */
+.apick{margin:12px 0 4px;padding:12px;border-radius:16px;background:var(--accent-soft);display:grid;gap:8px}
+.apick.done{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;background:var(--surface2);font-size:14px}
+.apick.done[hidden]{display:none}
+.apick .side-chips .chipbtn{min-height:44px}
+.site-vseg{align-self:center;margin:8px auto 2px;position:relative;z-index:2}
+.site-vseg button{min-height:38px;font-size:13px}
+.sx-under{stroke-dasharray:5 3;fill:var(--c-house);fill-opacity:.18}
+.gar-under{margin-top:10px}
+.gar-under .hint{display:block;font-size:13px;color:var(--muted);font-weight:400}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -1104,6 +1115,7 @@ inputsEl.insertAdjacentHTML('beforeend',`
 
   <div id="plotOut" hidden>
     <div class="plot-sum" id="plotSum"></div>
+    <div class="apick" id="aPick" hidden></div>
     <p class="eg-head">แตะตัวเลขเพื่อใส่ระยะที่วัดจริง (สีเทาคือระยะจากผังโฉนด) · แตะ “ถนน/คลอง” เพื่อเปลี่ยน · ด้านที่กำลังแก้จะขึ้นสีส้มในผัง</p>
     <div class="egs" id="edgeBody"></div>
     <div class="fitbox" id="fitBox" hidden></div>
@@ -1142,7 +1154,9 @@ inputsEl.insertAdjacentHTML('beforeend',`
 const $=id=>document.getElementById(id);
 
 function landCost(){return S.land.price}
-function itemCost(k){const o=S[k];return o.lock?o.fixed:o.area*o.rate}
+const garUnder=()=>!!(S.garage.under&&S.plan.floors>=2);
+const houseRate=()=>S.house.lock?(S.house.area?S.house.fixed/S.house.area:S.house.rate):S.house.rate;
+function itemCost(k){const o=S[k];if(o.lock)return o.fixed;if(k==='garage'&&garUnder())return o.area*houseRate();return o.area*o.rate}
 
 // bind money inputs: format on blur, update on input
 function bindMoney(id,get,set,f=fmt){
@@ -1279,6 +1293,8 @@ function update(){
     $(it.k+'-how').innerHTML=o.lock?`<b>ล็อกไว้</b> · เฉลี่ย ${o.area?fmt(c/o.area):'–'} บาท/${it.u}`:`${o.area} ${it.u} × ${fmt(o.rate)} บาท`;
     $(it.k+'-sub').textContent=fmt(c)+' บาท';
   });
+  if(garUnder()&&!S.garage.lock){$('garage-how').innerHTML=`${S.garage.area} ตร.ม. × ${fmt(houseRate())} บาท <b style="color:var(--accent)">ราคาตัวบ้าน (ใต้ชั้น 2)</b>`}
+  if($('garUnder')){$('garUnder').checked=!!S.garage.under;$('garUnder').disabled=S.plan.floors<2;$('garUnderHint').textContent=S.plan.floors<2?'ใช้ได้เมื่อบ้าน 2 ชั้นขึ้นไป':'ค่าก่อสร้างคิดเท่าตัวบ้าน และวางชิดตัวบ้าน'}
   const PG=plotGeom();
   const perim=PG?Math.round(PG.perimUse):Math.round(4*Math.sqrt(S.land.wa*4));
   $('perimText').textContent=PG?`รอบที่ดินตามผังโฉนด ${fmt1(PG.perimUse)} ม.${PG.nMeas?` (ใช้ระยะวัดจริง ${PG.nMeas} ด้าน)`:''}`:`รอบที่ดิน ${fmt(S.land.wa)} ตร.วา ประมาณ ${perim} ม. (คิดแบบสี่เหลี่ยมจัตุรัส)`;
@@ -1411,7 +1427,7 @@ text = ข้อความตามโฉนดสั้นๆ เช่น "�
     const pl=r&&r.plot;
     const pts=pl&&pl.found&&Array.isArray(pl.points)?pl.points.filter(p=>Array.isArray(p)&&p.length>=2).map(([x,y])=>[Math.min(1,Math.max(0,+x)),Math.min(1,Math.max(0,+y))]):[];
     if(pts.length>=3){
-      S.plot.pts=pts;
+      S.plot.aOk=false;S.plot.pts=pts;
       S.plot.labels=pts.map((_,i)=>String((pl.labels||[])[i]||'').trim());
       S.plot.sides=pts.map((_,i)=>{const d=(pl.sides||[])[i]||{};const t=['road','water','lake','land'].includes(d.t)?d.t:'land';const w=+d.w;return{t,w:w>0?w:'',open:true,src:String(d.text||'').trim()}});
       const sideNote=S.plot.sides.filter(x=>x.t!=='land').map(x=>`${SIDE_T[x.t]}${x.w?' '+fmtW(x.w)+' ม.':' (ไม่ระบุความกว้าง)'}`);
@@ -1603,7 +1619,7 @@ async function localDetect(fromUpload){
   if(!SNAP.pts||!SNAP.ink){try{const G=cvGray($('stageImg'),1000),ink=cvInk(G);SNAP.ink={m:ink,W:G.W,H:G.H};SNAP.pts=cvCorners(ink,G.W,G.H);SNAP.src=$('stageImg').getAttribute('src')}catch(e){}}
   const ar=S.plot.ar||1;LASTV={W:1000*ar,H:1000,upu:Math.max(LASTV.upu,1.2)};
   for(let k=0;k<2;k++)Q=Q.map((p,i)=>cvCornerAt(Q,i)||p);
-  S.plot.pts=Q;S.plot.labels=Q.map(()=>'');S.plot.meas=Q.map(()=>'');S.plot.sides=Q.map(()=>({t:'land',w:'',open:true}));S.fenceSides=[];
+  S.plot.aOk=false;S.plot.pts=Q;S.plot.labels=Q.map(()=>'');S.plot.meas=Q.map(()=>'');S.plot.sides=Q.map(()=>({t:'land',w:'',open:true}));S.fenceSides=[];
   vmode='deed';update();
   plotMsg(`จับหมุดจากเส้นในรูปได้ ${Q.length} หมุด เช็กว่าตรงมุมแปลงไหม ถ้าไม่ตรงกด “แก้หมุด” ลากหมุดไปใกล้มุม ระบบจะดูดเข้ามุมให้ · เลือกด้านที่ติดถนนในรายการด้านล่าง`,'ok');
   return Q.length;
@@ -1933,14 +1949,14 @@ function renderEdges(G){
           ${i>0?`<button type="button" class="btn" id="eg-a${i}">ตั้งเป็นด้าน A (ด้านหน้าติดถนน)</button>`:''}`;
         el.appendChild(p);
         p.querySelector('#eg-l'+i).addEventListener('input',e=>{S.plot.labels[i]=e.target.value.trim();update()});
-        const ab=p.querySelector('#eg-a'+i);if(ab)ab.onclick=()=>{rotatePlot(i);openSide=0;hiSide=0;plotMsg('ย้ายด้านนี้เป็นด้าน A แล้ว','ok');update()};
+        const ab=p.querySelector('#eg-a'+i);if(ab)ab.onclick=()=>{rotatePlot(i);S.plot.aOk=true;S.site.side=0;S.site.face='d';openSide=0;hiSide=0;plotMsg('ย้ายด้านนี้เป็นด้าน A แล้ว','ok');update()};
       }
       const q=id=>el.querySelector('#'+id+i);
       q('eg-m').addEventListener('input',e=>{const v=parse(e.target.value);S.plot.meas[i]=v>0?v:'';update()});
       q('eg-m').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur()}});
       q('eg-t').addEventListener('change',e=>{
         side(i).t=e.target.value;hiSide=i;
-        if(e.target.value==='road'&&i>0&&side(0).t!=='road'){rotatePlot(i);hiSide=0;if(openSide===i)openSide=0;plotMsg('ด้านที่ติดถนนตั้งเป็นด้าน A ให้แล้ว','ok')}
+        if(e.target.value==='road'&&i>0&&side(0).t!=='road'&&!S.plot.aOk){rotatePlot(i);hiSide=0;if(openSide===i)openSide=0;plotMsg('ด้านที่ติดถนนตั้งเป็นด้าน A ให้แล้ว','ok')}
         update()});
       const w=q('eg-w');if(w)w.addEventListener('click',()=>{hiSide=i;openWheel(i,w)});
       const o=q('eg-o');if(o)o.addEventListener('change',e=>{side(i).open=e.target.value==='1';update()});
@@ -2034,7 +2050,7 @@ window.__renderPlot=()=>{
   const BU=buildable(G);
   const nM=G.nMeas, n=G.lens.length;
   $('plotSum').innerHTML=`<span><b>${fmt1(G.areaM2/4)}</b> ตร.วา (${fmt(G.areaM2)} ตร.ม.)${G.fit==='meas'?' ตามระยะที่วัด':''} · ${n} ด้าน · รอบแปลง <b>${fmt1(G.perimUse)}</b> ม.${nM?` (วัดจริง ${nM} ด้าน)`:''}</span>`;
-  renderPlan(G,BU);renderEdges(G);renderLegal(G,BU);
+  renderAPick(G);renderPlan(G,BU);renderEdges(G);renderLegal(G,BU);
 };
 
 
@@ -2113,12 +2129,32 @@ attachGestures(svgS,'stage');attachGestures(svgP,'plan');
 $('pinOk').onclick=commitEdit;
 $('pinCancel').onclick=cancelEdit;
 // ---------- side order & fence by side ----------
+
+// ---------- front side (A): set from the road, ask when it is not clear ----------
+function renderAPick(G){
+  const box=$('aPick');if(!box)return;
+  if(!G||editPts||drawing){box.hidden=true;return}
+  const n=G.lens.length,roads=[];for(let i=0;i<n;i++)if(side(i).t==='road')roads.push(i);
+  if(!S.plot.aOk&&roads.length===1){const r0=roads[0];S.plot.aOk=true;if(r0>0){rotatePlot(r0);S.site.side=0;S.site.face='d';S.site.w=null;box.hidden=true;setTimeout(update,0);return}S.site.side=0;S.site.face='d';S.site.w=null}
+  if(S.plot.aOk){box.hidden=false;box.className='apick done';
+    box.innerHTML=`<span>ด้านหน้า (ติดถนน) คือ <b>ด้าน A</b> · ${fmt1(+(S.plot.meas||[])[0]>0?+S.plot.meas[0]:G.lens[0])} ม.</span><button type="button" class="eg-more" id="aChange">เปลี่ยน</button>`;
+    $('aChange').onclick=()=>{S.plot.aOk=false;update()};return}
+  box.hidden=false;box.className='apick';
+  const q=roads.length>1?'ติดถนนหลายด้าน ด้านไหนเป็นด้านหน้า':'ด้านไหนติดถนน (ด้านหน้า)';
+  box.innerHTML=`<p class="qlabel">${q}<span class="hint">แตะด้านในรายการนี้ ระบบจะตั้งเป็นด้าน A และใช้เป็นหน้าบ้านในแท็บตัวบ้าน</span></p><div class="side-chips">${
+    Array.from({length:n},(_,i)=>{const v=+(S.plot.meas||[])[i];return `<button type="button" class="chipbtn" data-a="${i}"><b>${LET(i)}</b>${fmt1(v>0?v:G.lens[i])} ม.${side(i).t==='road'?' · ถนน':side(i).t!=='land'?' · '+(TYPE_SHORT[side(i).t]||''):''}</button>`}).join('')}</div>`;
+  box.querySelectorAll('[data-a]').forEach(b=>{
+    b.onmouseenter=()=>{hiSide=+b.dataset.a;renderStage()};b.onfocus=b.onmouseenter;
+    b.onclick=()=>{const i=+b.dataset.a;const sd=side(i);if(sd.t==='land')sd.t='road';if(i>0)rotatePlot(i);
+      S.plot.aOk=true;S.site.side=0;S.site.face='d';S.site.w=null;hiSide=0;plotMsg('ตั้งด้านหน้าเป็นด้าน A แล้ว ใส่ความกว้างถนนได้ในรายการด้านล่าง','ok');update()}});
+}
 function rotatePlot(k){
   const n=S.plot.pts.length;if(!n||!k)return;
   const rot=a=>{if(!Array.isArray(a))return a;const b=Array.from({length:n},(_,i)=>a[(i+k)%n]);return b};
   for(let i=0;i<n;i++) side(i);
   S.plot.pts=rot(S.plot.pts);S.plot.labels=rot(S.plot.labels);S.plot.meas=rot(S.plot.meas);S.plot.sides=rot(S.plot.sides);
   S.fenceSides=rot(S.fenceSides||[]).map(Boolean);
+  if(S.site&&S.site.side!=null){S.site.side=((S.site.side|0)-k%n+n)%n;S.site.w=null}
 }
 function autoA(){
   const n=S.plot.pts.length;let best=-1,bw=-1;
@@ -2323,7 +2359,7 @@ $('wheel').addEventListener('keydown',e=>{if(e.key!=='Tab')return;const f=[$('wh
 (function(){
   const kit=$('card-kitchen');
   kit.insertAdjacentHTML('afterend',`
-  <div class="site-map" id="siteMap" data-tab="house"><svg id="siteSvg" role="img" aria-label="ผังวางบ้านบนที่ดิน"></svg>
+  <div class="site-map" id="siteMap" data-tab="house"><div class="vseg site-vseg" id="siteView" role="group" aria-label="มุมมองผัง"><button type="button" data-v="front">หน้าบ้านอยู่ล่าง</button><button type="button" data-v="deed">ตามโฉนด</button></div><svg id="siteSvg" role="img" aria-label="ผังวางบ้านบนที่ดิน"></svg>
     <div class="site-key" id="siteKey"><span><i style="background:var(--c-house);opacity:.6"></i>บ้านชั้นล่าง</span><span><i style="background:var(--c-garage);opacity:.6"></i>โรงรถ</span><span><i style="background:var(--c-kitchen);opacity:.6"></i>ครัว</span><span><i class="b"></i>แนวสร้างได้</span><span class="front-k" id="siteFront"></span></div>
     <div class="site-empty" id="siteEmpty" hidden><span>ยังไม่มีผังที่ดิน ทำผังในแท็บ “ที่ดิน” ก่อน แล้วจะวางบ้านให้ดูตรงนี้</span><button class="btn primary" type="button" id="siteGoLand">ไปทำผังที่ดิน</button></div>
   </div>
@@ -2357,7 +2393,9 @@ function siteFrame(G,BU){
   // which land side each facing points at
   const faceSide=k=>{const d=FACE_DIR[k],w=[d[0]*u[0]+d[1]*inn[0],d[0]*u[1]+d[1]*inn[1]];let best=0,bv=-2;
     for(let i=0;i<n;i++){const o=[-BU.L[i].inn[0],-BU.L[i].inn[1]],v=o[0]*w[0]+o[1]*w[1];if(v>bv){bv=v;best=i}}return best};
-  return {si,f,toW:p=>rot(toL(p)),faceSide};
+  const RI={d:ROT.d,u:ROT.u,l:ROT.r,r:ROT.l}[f];
+  const fromW=w=>{const L=RI(w);return [a[0]+L[0]*u[0]+L[1]*inn[0],a[1]+L[0]*u[1]+L[1]*inn[1]]};
+  return {si,f,toW:p=>rot(toL(p)),fromW,faceSide};
 }
 function chord(poly,y){
   const xs=[];for(let i=0;i<poly.length;i++){const [x1,y1]=poly[i],[x2,y2]=poly[(i+1)%poly.length];
@@ -2381,17 +2419,18 @@ const LAYOUTS=[
 ];
 function pieces(W,lay,gD0=5.5,kD0=3,floors=S.plan.floors,gWn=null){
   const fp=S.house.area/floors,hD=fp/W,list=[];
-  const g=S.garage.area>0?S.garage.area:0,k=S.kitchen.area>0?S.kitchen.area:0;
+  const g=S.garage.area>0?S.garage.area:0,k=S.kitchen.area>0?S.kitchen.area:0,under=!!(S.garage.under&&floors>=2&&g>0);
   let gD=gD0,gW=g/gD;if(lay.gar==='front'&&gW>W){gW=W;gD=g/W}
+  if(under){if(lay.id==='front'){gW=W;gD=g/W}else{gD=hD;gW=g/hD}}
   if(gWn){gW=gWn;gD=g/gWn}
   let kD=kD0,kW=k/kD;const kSide=lay.id.endsWith('k');
   if(!kSide&&kW>W){kW=W;kD=k/W}
   if(kSide){kW=Math.max(2.5,Math.min(kD0,k/Math.max(2,hD)));kD=k/kW;if(kD>hD){kD=hD;kW=k/hD}}
   const H={k:'house',w:W,h:hD,dx:0,y:0};
   if(g>0){
-    if(lay.id==='front'){list.push({k:'garage',w:gW,h:gD,dx:0,y:-gD})}
-    else if(lay.id==='side-l'||lay.id==='side-lk'){list.push({k:'garage',w:gW,h:gD,dx:-gW,y:0})}
-    else list.push({k:'garage',w:gW,h:gD,dx:W,y:0});
+    if(lay.id==='front'){list.push({k:'garage',w:gW,h:gD,dx:0,y:-gD,under})}
+    else if(lay.id==='side-l'||lay.id==='side-lk'){list.push({k:'garage',w:gW,h:gD,dx:-gW,y:0,under})}
+    else list.push({k:'garage',w:gW,h:gD,dx:W,y:0,under});
   }
   list.push(H);
   if(k>0){
@@ -2417,7 +2456,7 @@ function placeOne(poly,P,only){
 const GAR_MIN_W=3;
 function placeLay(poly,W,lay,floors){
   if(lay.narrow){ // garage narrower and deeper, never under 3 m wide
-    const g=S.garage.area;if(!(g>0))return null;
+    const g=S.garage.area;if(!(g>0)||(S.garage.under&&(floors||S.plan.floors)>=2))return null;
     const start=g/5-0.1;if(start<GAR_MIN_W)return null;
     for(let gw=Math.round(start*10)/10;gw>=GAR_MIN_W-1e-6;gw=Math.round((gw-0.1)*10)/10){
       for(const k of [3,2.5]){const r=placeOne(poly,pieces(W,lay,5,k,floors,gw));if(r)return r}}
@@ -2513,8 +2552,11 @@ window.__renderSite=()=>{
   msg.querySelectorAll('[data-gar]').forEach(b=>b.onclick=()=>{S.site.gar=b.dataset.gar;S.site.w=null;update()});
   const au=msg.querySelector('[data-auto]');if(au)au.onclick=()=>{S.site.w=null;update()};
   // ---- draw (house front at the bottom) ----
-  const toS=p=>{const q=F.toW(p);return [q[0],-q[1]]};
-  const land=G.m.map(toS),bp=poly.map(q=>[q[0],-q[1]]);
+  const deedV=S.site.view==='deed';
+  const toS=deedV?p=>[p[0],p[1]]:p=>{const q=F.toW(p);return [q[0],-q[1]]};
+  const S2=(wx,wy)=>deedV?F.fromW([wx,wy]):[wx,-wy];
+  const quad=(x,y,w,hh)=>[S2(x,y),S2(x+w,y),S2(x+w,y+hh),S2(x,y+hh)].map(z=>z.join(',')).join(' ');
+  const land=G.m.map(toS),bp=poly.map(q=>S2(q[0],q[1]));
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;const grow=([x,y])=>{x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y)};
   land.forEach(grow);
   let strips='';
@@ -2533,29 +2575,32 @@ window.__renderSite=()=>{
     P={x:hx,y:hy-hp.y,list:full}}
   const names={house:'บ้าน',garage:'โรงรถ',kitchen:'ครัว'};
   P.list.forEach(r=>{
-    const rx=P.x+r.dx,ry=P.y+r.y,X=rx,Y=-(ry+r.h);
+    const rx=P.x+r.dx,ry=P.y+r.y,C0=S2(rx+r.w/2,ry+r.h/2),X=C0[0]-r.w/2,Y=C0[1]-r.h/2;
     const thisBad=!pl&&!(house&&r.k==='house');
-    o+=`<rect class="sx-${r.k}${thisBad?' sx-bad':''}" x="${X}" y="${Y}" width="${r.w}" height="${r.h}" stroke-width="${1.6*Uu}"/>`;
+    o+=`<polygon class="sx-${r.k}${r.under?' sx-under':''}${thisBad?' sx-bad':''}" points="${quad(rx,ry,r.w,r.h)}" stroke-width="${1.6*Uu}"/>`;
     const big=r.w>fs*3.2&&r.h>fs*1.9;
-    if(r.k==='garage'&&big&&r.h>fs*3.4)o+=`<text class="sx-d" x="${X+r.w/2}" y="${Y+r.h/2+fs*.95}" font-size="${fs*.72}" stroke-width="${fs/5}" text-anchor="middle" dominant-baseline="middle">${sd2(r.w)}×${sd2(r.h)}</text>`;
+    if(r.under&&big)o+=`<text class="sx-d" x="${X+r.w/2}" y="${Y+r.h/2+fs*.95}" font-size="${fs*.7}" stroke-width="${fs/5}" text-anchor="middle" dominant-baseline="middle">ใต้ชั้น 2</text>`;
+    else if(r.k==='garage'&&big&&r.h>fs*3.4)o+=`<text class="sx-d" x="${X+r.w/2}" y="${Y+r.h/2+fs*.95}" font-size="${fs*.72}" stroke-width="${fs/5}" text-anchor="middle" dominant-baseline="middle">${sd2(r.w)}×${sd2(r.h)}</text>`;
     if(big){o+=`<text class="sx-t" x="${X+r.w/2}" y="${Y+r.h/2-(r.k==='house'?fs*.55:0)}" font-size="${fs}" stroke-width="${fs/5}" text-anchor="middle" dominant-baseline="middle">${names[r.k]}</text>`;
       const dimT=`${sd2(r.w)} × ${sd2(r.h)} ม.`,dfs=Math.min(fs*.85,(r.w-fs*.4)/Math.max(1,textW(dimT,1)));
       if(r.k==='house'&&dfs>=fs*.55)o+=`<text class="sx-d" x="${X+r.w/2}" y="${Y+r.h/2+fs*.65}" font-size="${dfs}" stroke-width="${fs/5}" text-anchor="middle" dominant-baseline="middle">${dimT}</text>`}
     else labs.push({x:X+r.w/2,y:Y+r.h/2,dir:[1,0],along:[0,1],t:names[r.k],fs:fs*.85,cls:'sx-t',sw:fs/5,pri:1});
   });
   if(pl){const first=P.list.reduce((a,b)=>a.y<=b.y?a:b),fx=P.x+first.dx+first.w/2,yb=Math.min(...ys);
-    if(P.y-yb>0.3){o+=`<line class="sx-gap" x1="${fx}" y1="${-yb}" x2="${fx}" y2="${-P.y}" stroke-width="${Uu}"/>`;labs.push({x:fx+fs*1.6,y:-(yb+P.y)/2,dir:[1,0],along:[0,1],t:sd2(P.y-yb)+' ม.',fs:fs*.8,cls:'sx-gapt',sw:fs/5,pri:2})}}
+    if(P.y-yb>0.3){const g1=S2(fx,yb),g2=S2(fx,P.y),gm=S2(fx,(yb+P.y)/2);o+=`<line class="sx-gap" x1="${g1[0]}" y1="${g1[1]}" x2="${g2[0]}" y2="${g2[1]}" stroke-width="${Uu}"/>`;labs.push({x:gm[0]+fs*1.6,y:gm[1],dir:[1,0],along:[0,1],t:sd2(P.y-yb)+' ม.',fs:fs*.8,cls:'sx-gapt',sw:fs/5,pri:2})}}
   G.m.forEach((p,i)=>{const q=G.m[(i+1)%n],a=toS(p),b=toS(q),mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
     const pi=toS([p[0]+BU.L[i].inn[0],p[1]+BU.L[i].inn[1]]),iv=[pi[0]-a[0],pi[1]-a[1]];
     const v=+(S.plot.meas||[])[i];labs.push({x:mx-iv[0]*fs*1.1,y:my-iv[1]*fs*1.1,dir:[-iv[0],-iv[1]],along:[iv[1],-iv[0]],t:`${LET(i)} · ${fmt1(v>0?v:G.lens[i])}`,fs:fs*.85,cls:'pl-t',sw:fs/6,pri:0});
     const sdi=side(i),sb=setbackFor(sdi);if(sdi.t!=='land'&&sb.d)labs.push({x:mx+iv[0]*(sb.d+fs),y:my+iv[1]*(sb.d+fs),dir:iv,along:[iv[1],-iv[0]],t:sb.short,fs:fs*.75,cls:'pl-sb',sw:fs/6,pri:1})});
-  $('siteFront').textContent=`▼ หน้าบ้าน (ล่างสุด) หันไปทางด้าน ${LET(F.faceSide(F.f))}`;
+  $('siteFront').textContent=deedV?`หน้าบ้านหันไปทางด้าน ${LET(F.faceSide(F.f))} · มุมมองตามโฉนด`:`▼ หน้าบ้าน (ล่างสุด) หันไปทางด้าน ${LET(F.faceSide(F.f))}`;
+  document.querySelectorAll('#siteView button').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.v==='deed')===deedV)));
   labs.sort((a,b)=>a.pri-b.pri);o+=placeLabels(labs,[]);
   svgX.setAttribute('viewBox',vb.join(' '));svgX.innerHTML=o;
 };
 $('siteW').addEventListener('input',e=>{S.site.w=+e.target.value;update()});
 $('siteD').addEventListener('input',e=>{const fp=S.house.area/S.plan.floors;S.site.w=Math.round(fp/+e.target.value*100)/100;update()});
 $('siteAuto').onclick=()=>{S.site.w=null;siteCache.key='';update()};
+document.querySelectorAll('#siteView button').forEach(b=>b.onclick=()=>{S.site.view=b.dataset.v;update()});
 $('siteFloors').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.plan.floors=+b.dataset.v;update()});
 $('siteGar').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.site.gar=b.dataset.v;S.site.w=null;update()});
 $('siteGoLand').onclick=()=>{typeof setTab==='function'?setTab('land',true):$('card-land').scrollIntoView()};
@@ -3071,6 +3116,12 @@ async function readHash(){
 window.addEventListener('hashchange',readHash);
 setTimeout(readHash,0);
 sampleReady.then(()=>{if(!canReadImg){const d=document.querySelector('#chUpload .cd');if(d)d.textContent='เลือกรูปโฉนด แล้วแตะมุมที่ดินบนรูปทีละจุด'}});
+
+// garage under the upper floor
+(function(){const c=$('card-garage');if(!c)return;const f=c.querySelector('.foot');
+  const l=document.createElement('label');l.className='eg-chk gar-under';
+  l.innerHTML='<input type="checkbox" id="garUnder"><span>โรงรถอยู่ใต้ชั้น 2<span class="hint" id="garUnderHint"></span></span>';
+  c.insertBefore(l,f);$('garUnder').addEventListener('change',e=>{S.garage.under=e.target.checked;S.site.w=null;update()})})();
 
 // ---------- name / rename ----------
 let nmNew=false;
