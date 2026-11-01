@@ -757,6 +757,47 @@ body:not([data-tab="list"]) #hmTitle::after{content:"";display:inline-block;widt
 .sx-under{stroke-dasharray:5 3;fill:var(--c-house);fill-opacity:.18}
 .gar-under{margin-top:10px}
 .gar-under .hint{display:block;font-size:13px;color:var(--muted);font-weight:400}
+
+/* PDF report (rendered off screen, light paper look) */
+.hm-pdf{width:100%;min-height:52px!important;margin-top:4px;gap:8px;font-size:16px!important}
+.pdfhost{position:fixed;left:-12000px;top:0;z-index:-1}
+.pdfpage{width:794px;height:1123px;overflow:hidden;background:#fff;color:#16181a;font-family:var(--body);font-size:14px;line-height:1.45;padding:44px 48px;box-sizing:border-box;
+  --c-land:#B4705C;--c-house:#B8913F;--c-garage:#6E7883;--c-kitchen:#5E9E80;--c-fence:#8A7BA6;--c-other:#8E9196}
+.pdfpage .ph{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #16181a;padding-bottom:10px;margin-bottom:18px}
+.pdfpage .pt{font-size:24px;font-weight:700}
+.pdfpage .ps{font-size:15px;color:#555}
+.pdfpage .pn{font-size:12px;color:#777}
+.pdfpage h3{font-size:16px;margin:18px 0 8px}
+.pdfpage .big{display:flex;gap:12px}
+.pdfpage .big>div{flex:1;border:1px solid #ddd;border-radius:12px;padding:12px 14px}
+.pdfpage .big small{display:block;color:#666;font-size:13px}
+.pdfpage .big b{font-size:24px}
+.pdfpage .g{color:#1c7547}.pdfpage .l{color:#b03434}
+.pdfpage .bar{display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;margin:14px 0 4px}
+.pdfpage .bar i{display:block}
+.pdfpage table{width:100%;border-collapse:collapse}
+.pdfpage .t td{padding:6px 4px;border-bottom:1px solid #e6e6e6;vertical-align:top}
+.pdfpage .t .th td{font-weight:700;color:#555;font-size:13px}
+.pdfpage .t .sum td{font-weight:700;border-top:2px solid #16181a;border-bottom:0}
+.pdfpage .r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pdfpage .m{color:#777;font-size:12.5px}
+.pdfpage small{color:#777}
+.pdfpage .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px;vertical-align:0}
+.pdfpage .imgs{display:flex;gap:12px}
+.pdfpage .imgs figure{flex:1;margin:0;border:1px solid #ddd;border-radius:10px;padding:6px;background:#111;text-align:center}
+.pdfpage .imgs img{display:block;width:100%;max-height:420px;object-fit:contain;margin:0 auto}
+.pdfpage .imgs.one img{max-height:460px}
+.pdfpage figcaption{color:#ddd;font-size:12px;margin-top:4px}
+.pdfpage .lg2{margin:0;padding-left:18px;font-size:13px}
+.pdfpage .lg2 li{margin:2px 0}
+.pdfpage .note{background:#f4f1ea;color:#222!important;border-radius:10px;padding:10px 12px;margin:10px 0 0;font-size:14px}
+.pdfpage .fls{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.pdfpage .fh{display:flex;justify-content:space-between;margin-bottom:6px}
+.pdfpage .fb{display:flex;height:22px;border-radius:6px;overflow:hidden;gap:2px;margin-bottom:6px}
+.pdfpage .fb i{display:block}
+.pdfpage .fl td{padding:3px 2px;border-bottom:1px solid #eee;font-size:13px}
+.pdfpage .ok{color:#1c7547;font-weight:600}.pdfpage .bad{color:#b03434;font-weight:600}
+.pdfpage .foot{margin-top:18px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -918,6 +959,7 @@ body:not([data-tab="list"]) #hmTitle::after{content:"";display:inline-block;widt
   <p class="sh-d">คนที่ได้รับกดบันทึกเก็บไว้ในเครื่องตัวเองได้ แก้ของใครของมัน ไม่กระทบกัน</p>
   <button class="sh-opt" id="shLink" type="button"><i><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></i><span><b>ส่งลิงก์</b><small>ส่งทางไลน์หรือแชตได้เลย ข้อมูลครบทุกอย่างยกเว้นรูปโฉนด</small></span></button>
   <button class="sh-opt" id="shFile" type="button"><i><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9.5 14.5L12 17l2.5-2.5"/></svg></i><span><b>ส่งเป็นไฟล์</b><small>รวมรูปโฉนดไปด้วย ผู้รับกด “เปิดไฟล์บ้านที่ได้รับ” ในหน้าแรก</small></span></button>
+  <button class="sh-opt" id="shPdf" type="button"><i><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8.5 13h7M8.5 16.5h5"/></svg></i><span><b>บันทึกเป็น PDF</b><small>รายงานสรุปต้นทุน ผังที่ดิน ผังบ้าน และห้อง พิมพ์หรือส่งต่อได้</small></span></button>
   <div class="sh-url" id="shUrlBox" hidden><input id="shUrl" readonly aria-label="ลิงก์แชร์"><button class="btn" id="shCopy" type="button">คัดลอก</button></div>
   <p class="sh-msg" id="shMsg" aria-live="polite"></p>
   <button class="btn sh-wide" id="shClose" type="button">ปิด</button>
@@ -1628,13 +1670,13 @@ async function autoFlatten(){
 }
 async function localDetect(fromUpload){
   let Q=null;try{Q=cvParcel()}catch(e){Q=null}
-  if(!Q||Q.length<3){if(!fromUpload)plotMsg('หากรอบที่ดินในรูปไม่เจอ กด “วาดกรอบเอง” แล้วแตะมุมที่ดินทีละจุด ระบบจะดูดหมุดเข้าหามุมเส้นให้','err');return 0}
+  if(!Q||Q.length<3){if(!fromUpload)plotMsg('หากรอบที่ดินในรูปไม่เจอ กด “วาดกรอบเอง” แล้วแตะมุมที่ดินทีละจุด','err');return 0}
   if(!SNAP.pts||!SNAP.ink){try{const G=cvGray($('stageImg'),1000),ink=cvInk(G);SNAP.ink={m:ink,W:G.W,H:G.H};SNAP.pts=cvCorners(ink,G.W,G.H);SNAP.src=$('stageImg').getAttribute('src')}catch(e){}}
   const ar=S.plot.ar||1;LASTV={W:1000*ar,H:1000,upu:Math.max(LASTV.upu,1.2)};
   for(let k=0;k<2;k++)Q=Q.map((p,i)=>cvCornerAt(Q,i)||p);
   S.plot.aOk=false;S.plot.pts=Q;S.plot.labels=Q.map(()=>'');S.plot.meas=Q.map(()=>'');S.plot.sides=Q.map(()=>({t:'land',w:'',open:true}));S.fenceSides=[];
   vmode='deed';update();
-  plotMsg(`จับหมุดจากเส้นในรูปได้ ${Q.length} หมุด เช็กว่าตรงมุมแปลงไหม ถ้าไม่ตรงกด “แก้หมุด” ลากหมุดไปใกล้มุม ระบบจะดูดเข้ามุมให้ · เลือกด้านที่ติดถนนในรายการด้านล่าง`,'ok');
+  plotMsg(`จับหมุดจากเส้นในรูปได้ ${Q.length} หมุด เช็กว่าตรงมุมแปลงไหม ถ้าไม่ตรงกด “แก้หมุด” แล้วลากหมุดไปวางเอง · เลือกด้านที่ติดถนนในรายการด้านล่าง`,'ok');
   return Q.length;
 }
 
@@ -1775,7 +1817,7 @@ function renderStage(){
   });
   labs.sort((a,b)=>a.pri-b.pri);
   h+=placeLabels(labs,P.map(p=>dotBox(p,r*1.6)));
-  if(dragI>=0&&P[dragI]){const s=drawing?snapFind(pts[dragI]):snapPin(pts,dragI);if(s)h+=`<circle class="st-snap" cx="${s[0]*W}" cy="${s[1]*H}" r="${r*2.2}" stroke-width="${sw*1.2}"/>`;h+=loupe(P[dragI],vb,upu)}
+  if(dragI>=0&&P[dragI]) h+=loupe(P[dragI],vb,upu);
   $('stageOv').innerHTML=h;
 }
 function svgPt(e){const pt=svgS.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const m=svgS.getScreenCTM();if(!m)return null;const q=pt.matrixTransform(m.inverse());const ar=S.plot.ar||1;return[Math.min(1,Math.max(0,q.x/(1000*ar))),Math.min(1,Math.max(0,q.y/1000))]}
@@ -1791,11 +1833,11 @@ svgS.addEventListener('pointerdown',e=>{
     if(editPts){selI=i;pinUIx()}
     dragI=i;svgS.setPointerCapture(e.pointerId);e.preventDefault();renderStage();return;
   }
-  if(drawing){const p0=svgPt(e);if(!p0)return;const p=snapFind(p0)||p0;S.plot.pts.push(p);S.plot.labels.push('');S.plot.meas.push('');renderStage();
+  if(drawing){const p=svgPt(e);if(!p)return;S.plot.pts.push(p);S.plot.labels.push('');S.plot.meas.push('');renderStage();
     plotMsg(`วางแล้ว ${S.plot.pts.length} จุด ${S.plot.pts.length>=3?'แตะจุดแรกหรือกด “เสร็จ” เพื่อปิดกรอบ':'แตะมุมถัดไป'}`)}
 });
 svgS.addEventListener('pointermove',e=>{if(cornerI>=0){const p=svgPt(e);if(p){corners[cornerI]=p;renderStage()}return}if(dragI<0)return;const p=svgPt(e);if(!p)return;(editPts||S.plot.pts)[dragI]=p;renderStage()});
-const endDrag=()=>{if(cornerI>=0){const s=snapFind(corners[cornerI]);if(s)corners[cornerI]=s}cornerI=-1;if(dragI<0){renderStage();return}const A=editPts||S.plot.pts,s=A[dragI]&&(drawing?snapFind(A[dragI]):snapPin(A,dragI));if(s)A[dragI]=s;dragI=-1;renderStage()};
+const endDrag=()=>{cornerI=-1;if(dragI<0){renderStage();return}dragI=-1;renderStage()};
 svgS.addEventListener('pointerup',endDrag);svgS.addEventListener('pointercancel',endDrag);
 
 function finishDraw(){drawing=false;$('plotDraw').setAttribute('aria-pressed','false');$('plotDraw').textContent='วาดกรอบเอง';stage.classList.remove('drawing');
@@ -3117,7 +3159,7 @@ $('rcSave').onclick=async()=>{
   $('projName').value=o.name;cur={id:null,name:'',saved:''};saveCur();update();
   await doSave(true);setTab('home',true);
 };
-function note(t,c){$('hmNote').textContent=t;$('hmNote').className='hm-note'+(c?' '+c:'')}
+function note(t,c){const el=document.body.dataset.tab==='list'?$('hmNote'):($('pdfNote')||$('hmNote'));el.textContent=t;el.className='hm-note'+(c?' '+c:'')}
 $('hmImport').onclick=()=>$('shImport').click();
 $('shImport').onchange=async e=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
   try{const o=JSON.parse(await f.text());if(o.app!=='house-cost')throw 0;note('');showIncoming(o)}catch(err){note('เปิดไฟล์นี้ไม่ได้ ต้องเป็นไฟล์ .house.json ที่ส่งมาจากแอปนี้','err')}};
@@ -3135,6 +3177,87 @@ sampleReady.then(()=>{if(!canReadImg){const d=document.querySelector('#chUpload 
   const l=document.createElement('label');l.className='eg-chk gar-under';
   l.innerHTML='<input type="checkbox" id="garUnder"><span>โรงรถอยู่ใต้ชั้น 2<span class="hint" id="garUnderHint"></span></span>';
   c.insertBefore(l,f);$('garUnder').addEventListener('change',e=>{S.garage.under=e.target.checked;S.site.w=null;update()})})();
+
+// ---------- PDF report ----------
+const esc2=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function loadLib(src,ok){if(ok())return Promise.resolve();return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('lib'));document.head.appendChild(s)})}
+async function svgUrl(svg,w){try{if(!svg||!svg.viewBox.baseVal||!svg.viewBox.baseVal.width||!svg.innerHTML.trim())return '';const b=await svgToPng(svg,w);return URL.createObjectURL(b)}catch(e){return ''}}
+function pdfPages(img){
+  const name=$('projName').value.trim()||('บ้าน '+fmt1(S.land.wa)+' ตร.วา');
+  const today=new Date().toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'});
+  const lc=landCost(),costs=[['ที่ดิน',lc,'--c-land'],['ตัวบ้าน',itemCost('house'),'--c-house'],[garUnder()?'โรงรถ (ใต้ชั้น 2)':'หลังคาโรงรถ',itemCost('garage'),'--c-garage'],['ครัว',itemCost('kitchen'),'--c-kitchen'],['รั้ว',itemCost('fence'),'--c-fence'],['ค่าอื่นๆ',S.other,'--c-other']];
+  const total=costs.reduce((a,c)=>a+(+c[1]||0),0),aL=S.apprLand*S.land.wa,aB=S.house.area*S.apprBuildRate,aT=aL+aB,dA=aT-total,dS=S.sale-total;
+  const cv=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const sg=(d)=>`<b class="${d>=0?'g':'l'}">${d>=0?'+':'−'}${fmt(Math.abs(d))}</b>`;
+  const head=(t,n)=>`<div class="ph"><div><div class="pt">${esc2(name)}</div><div class="ps">${t}</div></div><div class="pn">หน้า ${n}/3 · ${today}</div></div>`;
+  const G=plotGeom(),n=G?G.lens.length:0;
+  const sides=G?Array.from({length:n},(_,i)=>{const sd=side(i),v=+(S.plot.meas||[])[i],sb=setbackFor(sd);
+    return `<tr><td><b>${LET(i)}</b></td><td class="r">${fmt1(v>0?v:G.lens[i])} ม.${v>0?' <small>วัดจริง</small>':''}</td><td>${TYPE_SHORT[sd.t]||''}${sd.w?' กว้าง '+fmtW(sd.w)+' ม.':''}</td><td>${sb.d==null?'ใส่ความกว้าง':esc2(sb.short)}</td></tr>`}).join(''):'';
+  const legal=[...document.querySelectorAll('#legal .lg')].map(r=>`<li>${esc2(r.innerText.replace(/\s+/g,' ').trim())}</li>`).join('');
+  const site=(()=>{const m=$('siteMsg');if(!m)return '';const c=m.cloneNode(true);c.querySelectorAll('.site-steps,button,.warp-row').forEach(x=>x.remove());return c.textContent.replace(/\s+/g,' ').trim()})();
+  const PL=plan(S.house.area,S.plan);
+  const floors=PL.map(f=>{const all=[...f.rooms,...f.extra];
+    return `<div class="fl"><div class="fh"><b>ชั้น ${f.floor}</b><span>${fmt1(f.F)} ตร.ม.</span></div><div class="fb">${all.map(r=>`<i style="flex:${r.a};background:${cv(r.c)}"></i>`).join('')}</div>
+      <table>${all.map(r=>`<tr><td><i class="sw" style="background:${cv(r.c)}"></i>${esc2(r.label)}</td><td class="r">${fmt1(r.a)} ตร.ม.</td><td class="r">${r.sys?'':r.a>=r.min?'<span class="ok">พอดี</span>':'<span class="bad">แคบ</span>'}</td></tr>`).join('')}</table></div>`}).join('');
+  const p1=`${head('สรุปต้นทุนและราคา',1)}
+    <div class="big"><div><small>ต้นทุนรวม</small><b>${fmt(total)}</b> บาท</div><div><small>เทียบราคาประเมิน</small>${sg(dA)} บาท</div>${S.sale?`<div><small>ถ้าขายได้ ${fmt(S.sale)}</small>${sg(dS)} บาท</div>`:''}</div>
+    <div class="bar">${costs.filter(c=>c[1]>0).map(c=>`<i style="flex:${c[1]};background:${cv(c[2])}"></i>`).join('')}</div>
+    <h3>รายการต้นทุน</h3><table class="t">${costs.map(c=>`<tr><td><i class="sw" style="background:${cv(c[2])}"></i>${c[0]}</td><td class="r">${fmt(c[1])}</td><td class="r m">${total?Math.round(c[1]/total*100):0}%</td></tr>`).join('')}<tr class="sum"><td>รวม</td><td class="r">${fmt(total)}</td><td></td></tr></table>
+    <h3>รายละเอียด</h3><table class="t">
+      <tr><td>ที่ดิน</td><td class="r">${fmt1(S.land.wa)} ตร.วา · ซื้อ ${fmt(lc)} บาท (เฉลี่ย ${S.land.wa?fmt(lc/S.land.wa):'–'}/ตร.วา)</td></tr>
+      <tr><td>ตัวบ้าน</td><td class="r">${fmt(S.house.area)} ตร.ม. · ${S.plan.floors} ชั้น · ${S.house.lock?'ราคาเหมา':fmt(S.house.rate)+' บาท/ตร.ม.'}</td></tr>
+      <tr><td>โรงรถ</td><td class="r">${fmt(S.garage.area)} ตร.ม.${garUnder()?' · ใต้ชั้น 2 คิดราคาตัวบ้าน':''}</td></tr>
+      <tr><td>ครัว</td><td class="r">${fmt(S.kitchen.area)} ตร.ม.</td></tr>
+    </table>
+    <h3>ราคาประเมิน</h3><table class="t">
+      <tr><td>ที่ดิน ${fmt(S.apprLand)} บาท/ตร.วา</td><td class="r">${fmt(aL)}</td></tr>
+      <tr><td>ตัวบ้าน ${fmt(S.apprBuildRate)} บาท/ตร.ม.</td><td class="r">${fmt(aB)}</td></tr>
+      <tr class="sum"><td>ราคาประเมินรวม</td><td class="r">${fmt(aT)}</td></tr>
+    </table>`;
+  const p2=`${head('ที่ดินและระยะร่น',2)}
+    <div class="imgs">${img.deed?`<figure><img src="${img.deed}"><figcaption>บนรูปโฉนด</figcaption></figure>`:''}${img.plan?`<figure><img src="${img.plan}"><figcaption>ผังตามสเกล</figcaption></figure>`:''}${!img.deed&&!img.plan?'<p class="m">ยังไม่มีผังที่ดิน</p>':''}</div>
+    ${G?`<h3>ด้านของที่ดิน · ${fmt1(S.land.wa)} ตร.วา (${fmt(S.land.wa*4)} ตร.ม.)</h3><table class="t"><tr class="th"><td>ด้าน</td><td class="r">ยาว</td><td>ติดกับ</td><td>ระยะร่น/เว้น</td></tr>${sides}</table>`:''}
+    ${legal?`<h3>ข้อกฎหมาย</h3><ul class="lg2">${legal}</ul><p class="m">อิงกฎกระทรวงฉบับที่ 55 แบบย่อ เช็กกับกองช่างในพื้นที่ก่อนยื่นขออนุญาต</p>`:''}`;
+  const p3=`${head('วางบ้านบนที่ดินและแบ่งห้อง',3)}
+    ${img.site?`<div class="imgs one"><figure><img src="${img.site}"><figcaption>${esc2($('siteFront')?$('siteFront').textContent:'')}</figcaption></figure></div>`:''}
+    ${site?`<p class="note">${esc2(site)}</p>`:''}
+    <h3>แบ่งห้อง · ${fmt(S.house.area)} ตร.ม. / ${S.plan.floors} ชั้น</h3><div class="fls">${floors}</div>
+    <p class="m foot">สร้างจากแอปคิดต้นทุนบ้าน · ตัวเลขเป็นการประมาณการ</p>`;
+  return {name,pages:[p1,p2,p3]};
+}
+async function makePdf(btn){
+  const say=(t,c)=>{shSay(t,c);note(t,c)};
+  if(btn)btn.disabled=true;say('กำลังสร้าง PDF…');
+  const urls=[];
+  try{
+    await loadLib('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas);
+    await loadLib('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf&&window.jspdf.jsPDF);
+    window.__renderPlot&&window.__renderPlot();window.__renderSite&&window.__renderSite();
+    const img={deed:await svgUrl(svgS,1400),plan:await svgUrl(svgP,1400),site:await svgUrl($('siteSvg'),1400)};
+    Object.values(img).forEach(u=>u&&urls.push(u));
+    const R=pdfPages(img);
+    const host=document.createElement('div');host.className='pdfhost';document.body.appendChild(host);
+    const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4',compress:true});
+    for(let i=0;i<R.pages.length;i++){
+      host.innerHTML=`<div class="pdfpage">${R.pages[i]}</div>`;
+      await Promise.all([...host.querySelectorAll('img')].map(im=>im.complete?0:new Promise(r=>{im.onload=im.onerror=r})));
+      if(document.fonts&&document.fonts.ready)await document.fonts.ready;
+      const c=await window.html2canvas(host.firstChild,{scale:2,backgroundColor:'#ffffff',logging:false,useCORS:true});
+      if(i)pdf.addPage();pdf.addImage(c.toDataURL('image/jpeg',.9),'JPEG',0,0,210,297);
+    }
+    host.remove();
+    const file=new File([pdf.output('blob')],fileSafe(R.name)+'.pdf',{type:'application/pdf'});
+    if(!inClaude&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:R.name});say('ส่ง PDF แล้ว');return}catch(e){if(e&&e.name==='AbortError'){say('');return}}}
+    await window.__saveBlob(file.name,file);say('บันทึก “'+file.name+'” แล้ว');
+  }catch(e){say(e&&e.code==='declined'?'ยกเลิกแล้ว':e&&e.message==='lib'?'โหลดตัวสร้าง PDF ไม่ได้ เช็กอินเทอร์เน็ตแล้วลองใหม่':'สร้าง PDF ไม่สำเร็จ ลองอีกครั้ง','err')}
+  finally{urls.forEach(u=>URL.revokeObjectURL(u));const hst=document.querySelector('.pdfhost');if(hst)hst.remove();if(btn)btn.disabled=false}
+}
+$('shPdf').onclick=()=>makePdf($('shPdf'));
+(function(){const pc=document.querySelector('section.projects');if(!pc)return;
+  const b=document.createElement('button');b.type='button';b.className='btn primary hm-pdf';b.id='hmPdf';
+  b.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9.5 14.5L12 17l2.5-2.5"/></svg>บันทึกเป็น PDF';
+  const m=document.createElement('p');m.className='hm-note';m.id='pdfNote';m.setAttribute('aria-live','polite');
+  pc.appendChild(b);pc.appendChild(m);b.onclick=()=>makePdf(b)})();
 
 // ---------- name / rename ----------
 let nmNew=false;
