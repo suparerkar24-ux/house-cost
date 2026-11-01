@@ -706,6 +706,29 @@ body[data-tab="list"] .hm-share{display:none}
 .rc-card b{font-size:18px}
 .rc-card span{font-size:14px;color:var(--muted)}
 body.sh-open{overflow:hidden}
+
+/* lines on the deed photo: strong colours with a white casing so they stand out on paper */
+#stageOv{--ink:#1565FF;--ink2:#E0007A}
+#stageOv .st-case{fill:none;stroke:#fff;stroke-opacity:.95;stroke-linejoin:round}
+#stageOv .st-poly{fill:var(--ink);fill-opacity:.1;stroke:var(--ink)}
+#stageOv .st-open{stroke:var(--ink)}
+#stageOv .st-h{fill:#fff;fill-opacity:1;stroke:var(--ink)}
+#stageOv .st-h.sel,#stageOv .st-h.on{fill:var(--ink);stroke:#fff}
+#stageOv .st-len{fill:var(--ink);stroke:#fff}
+#stageOv .st-lbl{fill:#111;stroke:#fff}
+#stageOv .st-build{stroke:var(--ink2)}
+#stageOv .st-dim{stroke:var(--ink2)}
+#stageOv .st-sb{fill:var(--ink2);stroke:#fff}
+#stageOv .st-hi{stroke:#FF9F0A;opacity:.85}
+#stageOv .st-add{fill:#fff;stroke:var(--ink2)}
+#stageOv .st-add-t{fill:var(--ink2);stroke:none}
+#stageOv .st-quad{fill:var(--ink2);fill-opacity:.08;stroke:var(--ink2)}
+#stageOv .st-c{fill:var(--ink2);stroke:#fff}
+#stageOv .st-ct{fill:#fff}
+#stageOv .st-snap{fill:none;stroke:#00C853}
+#stageOv .st-loupe-ring{stroke:var(--ink)}
+#card-plot.lay-off-frame .st-case{display:none}
+#card-plot.lay-off-build .st-case-b{display:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -894,7 +917,7 @@ const DEFAULTS={
   kitchen:{area:12,rate:7000,lock:false,fixed:84000},
   fence:{area:40,rate:1800,lock:false,fixed:72000},
   plot:{ar:1,pts:[],labels:[],meas:[],sides:[]},
-  paper:{w:21,h:29.7},
+  paper:{w:31,h:43},
   fenceSides:[], gate:4,
   layers:{img:true,frame:true,len:true,setback:true,build:true,road:true,pins:true,scale:true},
   other:30000, sale:2200000, apprLand:12000, apprBuildRate:18000,
@@ -1048,10 +1071,12 @@ inputsEl.insertAdjacentHTML('beforeend',`
   <span class="deed-msg" id="saveMsg"></span>
 
   <div class="warp" id="warpPanel" hidden>
-    <div class="small">ลากจุด 1–4 ไปที่มุมกระดาษโฉนด เรียง ซ้ายบน → ขวาบน → ขวาล่าง → ซ้ายล่าง แล้วใส่ขนาดกระดาษจริง (เอาไม้บรรทัดวัด)</div>
+    <div class="small">ลากจุด 1–4 ไปที่มุมกระดาษโฉนด เรียง ซ้ายบน → ขวาบน → ขวาล่าง → ซ้ายล่าง กระดาษโฉนดปกติ 31 × 43 (ระบบใช้แค่สัดส่วน)</div>
     <div class="warp-row">
-      <label class="mini">กว้าง <input class="num-in" id="paperW" inputmode="decimal"> ซม.</label>
-      <label class="mini">สูง <input class="num-in" id="paperH" inputmode="decimal"> ซม.</label>
+      <button class="btn" type="button" data-paper="31,43">โฉนด 31 × 43</button>
+      <button class="btn" type="button" data-paper="21,29.7">A4</button>
+      <label class="mini">กว้าง <input class="num-in" id="paperW" inputmode="decimal"></label>
+      <label class="mini">สูง <input class="num-in" id="paperH" inputmode="decimal"></label>
       <button class="btn" type="button" id="paperSwap">สลับแนวตั้ง/นอน</button>
     </div>
     <div class="warp-row">
@@ -1168,6 +1193,7 @@ function normalize(x){
   x=(x&&x.plan)?x:structuredClone(DEFAULTS);
   for(const k in DEFAULTS){if(x[k]==null)x[k]=structuredClone(DEFAULTS[k])}
   if(x.land.price==null){x.land.price=x.land.lock?(+x.land.fixed||0):(+x.land.wa||0)*(+x.land.rate||0);delete x.land.rate;delete x.land.fixed;delete x.land.lock}
+  if(x.paper&&+x.paper.w===21&&+x.paper.h===29.7)x.paper={w:31,h:43};
   delete x.appraisal;delete x.apprBuild;return x;
 }
 function syncInputs(){
@@ -1389,9 +1415,144 @@ text = ข้อความตามโฉนดสั้นๆ เช่น "�
   }finally{btns.forEach(b=>b.disabled=false)}
 }
 $('deedRead').onclick=()=>readDeed('all');
-$('plotDetect').onclick=()=>readDeed('plot');
+$('plotDetect').onclick=()=>canReadImg?readDeed('plot'):localDetect(false);
 
 
+
+// ---------- on-device line reading: pin snapping + parcel finder (no AI needed) ----------
+let LASTV={W:1000,H:1000,upu:1};
+const SNAP={src:'',pts:null,job:0};
+function cvGray(img,maxS){
+  const sc=Math.min(1,maxS/Math.max(img.naturalWidth,img.naturalHeight));
+  const W=Math.max(1,Math.round(img.naturalWidth*sc)),H=Math.max(1,Math.round(img.naturalHeight*sc));
+  const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,0,0,W,H);
+  const d=x.getImageData(0,0,W,H).data,g=new Float32Array(W*H);
+  for(let i=0,j=0;i<g.length;i++,j+=4)g[i]=.3*d[j]+.59*d[j+1]+.11*d[j+2];
+  return {g,W,H};
+}
+function cvIntegral(a,W,H){const I=new Float64Array((W+1)*(H+1));for(let y=0;y<H;y++){let s=0;for(let x=0;x<W;x++){s+=a[y*W+x];I[(y+1)*(W+1)+x+1]=I[y*(W+1)+x+1]+s}}return I}
+function cvBox(I,W,H,x,y,r){const x0=Math.max(0,x-r),y0=Math.max(0,y-r),x1=Math.min(W,x+r+1),y1=Math.min(H,y+r+1);return (I[y1*(W+1)+x1]-I[y0*(W+1)+x1]-I[y1*(W+1)+x0]+I[y0*(W+1)+x0])/((x1-x0)*(y1-y0))}
+function cvInk({g,W,H}){
+  const I=cvIntegral(g,W,H),ink=new Uint8Array(W*H),r=Math.max(7,Math.round(Math.min(W,H)/40));
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=g[y*W+x],m=cvBox(I,W,H,x,y,r);if(v<m-14&&v<205)ink[y*W+x]=1}
+  return ink;
+}
+function cvCorners(ink,W,H){
+  // Harris on the ink mask: strong where two lines meet
+  const f=new Float32Array(W*H);for(let i=0;i<f.length;i++)f[i]=ink[i];
+  const xx=new Float32Array(W*H),yy=new Float32Array(W*H),xy=new Float32Array(W*H);
+  for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const i=y*W+x;
+    const gx=(f[i-W+1]+2*f[i+1]+f[i+W+1])-(f[i-W-1]+2*f[i-1]+f[i+W-1]),gy=(f[i+W-1]+2*f[i+W]+f[i+W+1])-(f[i-W-1]+2*f[i-W]+f[i-W+1]);
+    xx[i]=gx*gx;yy[i]=gy*gy;xy[i]=gx*gy}
+  const Ix=cvIntegral(xx,W,H),Iy=cvIntegral(yy,W,H),Ixy=cvIntegral(xy,W,H),R=new Float32Array(W*H);let mx=0;
+  for(let y=2;y<H-2;y++)for(let x=2;x<W-2;x++){const a=cvBox(Ix,W,H,x,y,2),b=cvBox(Iy,W,H,x,y,2),c=cvBox(Ixy,W,H,x,y,2),v=a*b-c*c-.05*(a+b)*(a+b);R[y*W+x]=v;if(v>mx)mx=v}
+  const out=[],th=mx*.02,n=4;
+  for(let y=n;y<H-n;y++)for(let x=n;x<W-n;x++){const v=R[y*W+x];if(v<=th)continue;let best=true;
+    for(let dy=-n;dy<=n&&best;dy++)for(let dx=-n;dx<=n;dx++){if((dx||dy)&&R[(y+dy)*W+x+dx]>v){best=false;break}}
+    if(best)out.push([v,(x+.5)/W,(y+.5)/H])}
+  out.sort((a,b)=>b[0]-a[0]);return out.slice(0,4000).map(o=>[o[1],o[2]]);
+}
+function snapEnsure(){
+  const img=$('stageImg'),src=img&&img.getAttribute('src')||'';
+  if(!src){SNAP.src='';SNAP.pts=null;return}
+  if(SNAP.src===src)return;
+  SNAP.src=src;SNAP.pts=null;SNAP.ink=null;const job=++SNAP.job;
+  const run=()=>setTimeout(()=>{if(job!==SNAP.job)return;try{const G=cvGray(img,1000),ink=cvInk(G);SNAP.ink={m:ink,W:G.W,H:G.H};SNAP.pts=cvCorners(ink,G.W,G.H)}catch(e){SNAP.pts=[]}},60);
+  if(img.complete&&img.naturalWidth)run();else img.addEventListener('load',run,{once:true});
+}
+function snapFind(p){
+  if(!p||!SNAP.pts||!SNAP.pts.length)return null;
+  const {W,H,upu}=LASTV,R=16*upu;let best=null,bd=R*R;
+  for(const q of SNAP.pts){const dx=(q[0]-p[0])*W,dy=(q[1]-p[1])*H,d=dx*dx+dy*dy;if(d<bd){bd=d;best=q}}
+  return best?[best[0],best[1]]:null;
+}
+function cvFitEdge(p,q){
+  const K=SNAP.ink;if(!K)return null;const {m,W,H}=K;
+  const ax=p[0]*W,ay=p[1]*H,bx=q[0]*W,by=q[1]*H,L=Math.hypot(bx-ax,by-ay);if(L<12)return null;
+  const spx=LASTV.upu*H/1000,ux=(bx-ax)/L,uy=(by-ay)/L,nx=-uy,ny=ux,R=Math.max(8,Math.round(Math.min(W,H)*.022),Math.round(26*spx)),hits=[];
+  for(let k=0;k<=28;k++){const t=.18+.64*k/28,cx=ax+(bx-ax)*t,cy=ay+(by-ay)*t;let bs=null;
+    for(let s=0;s<=R&&bs==null;s++)for(const sg of s?[1,-1]:[1]){const x=Math.round(cx+nx*s*sg),y=Math.round(cy+ny*s*sg);if(x>=0&&y>=0&&x<W&&y<H&&m[y*W+x]){bs=s*sg;break}}
+    if(bs!=null){ // centre of the ink run across the line
+      let a=bs,b=bs;const at=s=>{const x=Math.round(cx+nx*s),y=Math.round(cy+ny*s);return x>=0&&y>=0&&x<W&&y<H&&m[y*W+x]};
+      while(a-1>=-R-4&&at(a-1))a--;while(b+1<=R+4&&at(b+1))b++;const s=(a+b)/2;hits.push([cx+nx*s,cy+ny*s])}}
+  if(hits.length<12)return null;
+  const mx=hits.reduce((s,p)=>s+p[0],0)/hits.length,my=hits.reduce((s,p)=>s+p[1],0)/hits.length;
+  let sxx=0,syy=0,sxy=0;hits.forEach(([x,y])=>{sxx+=(x-mx)**2;syy+=(y-my)**2;sxy+=(x-mx)*(y-my)});
+  const th=.5*Math.atan2(2*sxy,sxx-syy);return {c:[mx,my],d:[Math.cos(th),Math.sin(th)],W,H};
+}
+function cvCornerAt(A,i){
+  const n=A.length;if(n<3||!SNAP.ink)return null;
+  const L1=cvFitEdge(A[(i-1+n)%n],A[i]),L2=cvFitEdge(A[i],A[(i+1)%n]);if(!L1||!L2)return null;
+  const d=L1.d[0]*L2.d[1]-L1.d[1]*L2.d[0];if(Math.abs(d)<.2)return null;
+  const t=((L2.c[0]-L1.c[0])*L2.d[1]-(L2.c[1]-L1.c[1])*L2.d[0])/d,x=L1.c[0]+t*L1.d[0],y=L1.c[1]+t*L1.d[1];
+  const W=L1.W,H=L1.H,lim=Math.max(Math.min(W,H)*.035,34*LASTV.upu*H/1000);if(Math.hypot(x-A[i][0]*W,y-A[i][1]*H)>lim)return null;
+  return [x/W,y/H];
+}
+function snapPin(A,i){return cvCornerAt(A,i)||snapFind(A[i])}
+function cvHull(P){P.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);const lo=[],up=[];
+  for(const p of P){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p)}
+  for(let i=P.length-1;i>=0;i--){const p=P[i];while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p)}
+  up.pop();lo.pop();return lo.concat(up)}
+const cvArea=Q=>{let a=0;for(let i=0;i<Q.length;i++){const p=Q[i],q=Q[(i+1)%Q.length];a+=p[0]*q[1]-q[0]*p[1]}return Math.abs(a)/2};
+function cvSimplify(Q){
+  Q=Q.slice();const A=cvArea(Q);
+  const ix=(p1,p2,p3,p4)=>{const d=(p1[0]-p2[0])*(p3[1]-p4[1])-(p1[1]-p2[1])*(p3[0]-p4[0]);if(Math.abs(d)<1e-9)return null;
+    const t=((p1[0]-p3[0])*(p3[1]-p4[1])-(p1[1]-p3[1])*(p3[0]-p4[0]))/d;return[p1[0]+t*(p2[0]-p1[0]),p1[1]+t*(p2[1]-p1[1])]};
+  // first drop near-straight vertices, then fold short chamfer edges (pin circles bite the corners) back into one corner
+  const straight=()=>{let ch=true;while(ch&&Q.length>3){ch=false;for(let i=0;i<Q.length;i++){const a=Q[(i-1+Q.length)%Q.length],b=Q[i],c=Q[(i+1)%Q.length];
+    const u=Math.atan2(b[1]-a[1],b[0]-a[0]),v=Math.atan2(c[1]-b[1],c[0]-b[0]);let d=Math.abs(u-v)*180/Math.PI;if(d>180)d=360-d;if(d<12){Q.splice(i,1);ch=true;break}}}};
+  straight();
+  const lim=Math.sqrt(A)*.12;
+  for(let k=0;k<40&&Q.length>3;k++){let mi=-1,ml=Infinity;
+    for(let i=0;i<Q.length;i++){const p=Q[i],q=Q[(i+1)%Q.length],l=Math.hypot(q[0]-p[0],q[1]-p[1]);if(l<ml){ml=l;mi=i}}
+    if(ml>=lim)break;const n=Q.length,a=Q[(mi-1+n)%n],b=Q[mi],c=Q[(mi+1)%n],d=Q[(mi+2)%n];
+    let p=ix(a,b,c,d);if(!p||Math.hypot(p[0]-b[0],p[1]-b[1])>lim*2)p=[(b[0]+c[0])/2,(b[1]+c[1])/2];
+    Q.splice(mi,1,p);Q.splice((mi+1)%Q.length,1);straight()}
+  while(Q.length>3){let mi=-1,mv=Infinity;
+    for(let i=0;i<Q.length;i++){const a=Q[(i-1+Q.length)%Q.length],b=Q[i],c=Q[(i+1)%Q.length];const t=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]))/2;if(t<mv){mv=t;mi=i}}
+    if(Q.length>8||mv<A*.006)Q.splice(mi,1);else break}
+  return Q;
+}
+function cvParcel(){
+  const img=$('stageImg');if(!img||!img.naturalWidth)return null;
+  const G=cvGray(img,800),{W,H}=G,ink0=cvInk(G),N=W*H;
+  // close small gaps in the lines
+  const ink=new Uint8Array(N);for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const i=y*W+x;if(ink0[i]||ink0[i-1]||ink0[i+1]||ink0[i-W]||ink0[i+W])ink[i]=1}
+  const lab=new Int32Array(N).fill(-1),R=[],st=new Int32Array(N);
+  for(let s=0;s<N;s++){if(ink[s]||lab[s]>=0)continue;const id=R.length;let sp=0,area=0,x0=W,y0=H,x1=0,y1=0,edge=false;st[sp++]=s;lab[s]=id;
+    while(sp){const i=st[--sp],x=i%W,y=(i-x)/W;area++;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;if(!x||!y||x===W-1||y===H-1)edge=true;
+      if(x>0&&!ink[i-1]&&lab[i-1]<0){lab[i-1]=id;st[sp++]=i-1}if(x<W-1&&!ink[i+1]&&lab[i+1]<0){lab[i+1]=id;st[sp++]=i+1}
+      if(y>0&&!ink[i-W]&&lab[i-W]<0){lab[i-W]=id;st[sp++]=i-W}if(y<H-1&&!ink[i+W]&&lab[i+W]<0){lab[i+W]=id;st[sp++]=i+W}}
+    R.push({id,area,x0,y0,x1,y1,edge})}
+  const md=Math.min(W,H);
+  let C=R.filter(r=>!r.edge&&r.area>N*.004&&r.area<N*.35&&Math.min(r.x1-r.x0,r.y1-r.y0)>md*.06&&r.area/((r.x1-r.x0+1)*(r.y1-r.y0+1))>.35);
+  // a frame that holds another candidate inside it is not the parcel
+  C=C.filter(a=>!C.some(b=>b!==a&&b.x0>=a.x0&&b.x1<=a.x1&&b.y0>=a.y0&&b.y1<=a.y1&&b.area>a.area*.12));
+  let best=null,bs=0;
+  for(const r of C){
+    const pts=[];for(let y=r.y0;y<=r.y1;y++)for(let x=r.x0;x<=r.x1;x++)if(lab[y*W+x]===r.id)pts.push([x,y]);
+    const hull=cvHull(pts),ha=cvArea(hull),sol=r.area/(ha||1);if(sol<.8)continue;
+    const Q=cvSimplify(hull);
+    const axis=Q.length===4&&Q.every((p,i)=>{const q=Q[(i+1)%4],a=Math.abs(Math.atan2(q[1]-p[1],q[0]-p[0]))*180/Math.PI;return Math.min(a%90,90-a%90)<2.5});
+    const sc=r.area*sol*(axis?.35:1);
+    if(sc>bs){bs=sc;best=Q}
+  }
+  if(!best)return null;
+  // pull the vertices out to the middle of the drawn line, then onto line corners when close
+  const cx=best.reduce((a,p)=>a+p[0],0)/best.length,cy=best.reduce((a,p)=>a+p[1],0)/best.length;
+  return best.map(([x,y])=>{const dx=x-cx,dy=y-cy,L=Math.hypot(dx,dy)||1;return[(x+dx/L*2+.5)/W,(y+dy/L*2+.5)/H]});
+}
+async function localDetect(fromUpload){
+  let Q=null;try{Q=cvParcel()}catch(e){Q=null}
+  if(!Q||Q.length<3){if(!fromUpload)plotMsg('หากรอบที่ดินในรูปไม่เจอ กด “วาดกรอบเอง” แล้วแตะมุมที่ดินทีละจุด ระบบจะดูดหมุดเข้าหามุมเส้นให้','err');return 0}
+  if(!SNAP.pts||!SNAP.ink){try{const G=cvGray($('stageImg'),1000),ink=cvInk(G);SNAP.ink={m:ink,W:G.W,H:G.H};SNAP.pts=cvCorners(ink,G.W,G.H);SNAP.src=$('stageImg').getAttribute('src')}catch(e){}}
+  const ar=S.plot.ar||1;LASTV={W:1000*ar,H:1000,upu:Math.max(LASTV.upu,1.2)};
+  for(let k=0;k<2;k++)Q=Q.map((p,i)=>cvCornerAt(Q,i)||p);
+  S.plot.pts=Q;S.plot.labels=Q.map(()=>'');S.plot.meas=Q.map(()=>'');S.plot.sides=Q.map(()=>({t:'land',w:'',open:true}));S.fenceSides=[];
+  vmode='deed';update();
+  plotMsg(`จับหมุดจากเส้นในรูปได้ ${Q.length} หมุด เช็กว่าตรงมุมแปลงไหม ถ้าไม่ตรงกด “แก้หมุด” ลากหมุดไปใกล้มุม ระบบจะดูดเข้ามุมให้ · เลือกด้านที่ติดถนนในรายการด้านล่าง`,'ok');
+  return Q.length;
+}
 
 // ---------- plot editor ----------
 const stage=$('stage'), svgS=$('stageSvg'), svgP=$('planSvg');
@@ -1486,7 +1647,8 @@ function renderStage(){
   im.setAttribute('width',W);im.setAttribute('height',H);
   const vb=applyView('stage',stageBox(W,H));svgS.setAttribute('viewBox',vb.join(' '));
   const upu=Math.max(vb[2]/(svgS.clientWidth||Math.min(600,innerWidth-32)),svgS.clientHeight?vb[3]/svgS.clientHeight:0); // user units per screen pixel
-  const r=6*upu, sw=1.6*upu, fs=14*upu, hitR=22*upu;
+  const r=6*upu, sw=2.2*upu, fs=14*upu, hitR=22*upu;
+  LASTV={W,H,upu};snapEnsure();
   toolsUI(pts.length);
   $('plotZoom').textContent=zoomPlot?'ดูทั้งใบ':'ซูมเฉพาะแปลง';
   const P=pts.map(([x,y])=>[x*W,y*H]);
@@ -1498,13 +1660,13 @@ function renderStage(){
     if(cornerI>=0) h+=loupe(C[cornerI],vb,upu);
     $('stageOv').innerHTML=h;return;
   }
-  if(P.length>=3&&!drawing) h+=`<polygon class="st-poly" stroke-width="${sw}" points="${P.map(p=>p.join(',')).join(' ')}"/>`;
+  if(P.length>=3&&!drawing) h+=`<polygon class="st-case" stroke-width="${sw*2.6}" points="${P.map(p=>p.join(',')).join(' ')}"/>`+`<polygon class="st-poly" stroke-width="${sw}" points="${P.map(p=>p.join(',')).join(' ')}"/>`;
   else if(P.length>=2) h+=`<polyline class="st-open" stroke-width="${sw}" points="${P.map(p=>p.join(',')).join(' ')}"/>`;
   const G=editPts?null:plotGeom();const labs=[];
   if(G&&!drawing){
     const BU=buildable(G), u=1000/G.k;
     if(hiSide>=0&&hiSide<P.length){const a=P[hiSide],b=P[(hiSide+1)%P.length];h+=`<line class="st-hi" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke-width="${sw*4}"/>`}
-    if(BU.pts) h=`<polygon class="st-build" stroke-width="${sw}" points="${BU.pts.map(([x,y])=>(x*u)+','+(y*u)).join(' ')}"/>`+h;
+    if(BU.pts) h=`<polygon class="st-case st-case-b" stroke-width="${sw*2.2}" points="${BU.pts.map(([x,y])=>(x*u)+','+(y*u)).join(' ')}"/>`+`<polygon class="st-build" stroke-width="${sw}" points="${BU.pts.map(([x,y])=>(x*u)+','+(y*u)).join(' ')}"/>`+h;
     P.forEach((p,i)=>{
       const q=P[(i+1)%P.length],inn=BU.L[i].inn,mx=(p[0]+q[0])/2,my=(p[1]+q[1])/2,sd=side(i);
       const ex=q[0]-p[0],ey=q[1]-p[1],el=Math.hypot(ex,ey)||1,al=[ex/el,ey/el];
@@ -1529,7 +1691,7 @@ function renderStage(){
   });
   labs.sort((a,b)=>a.pri-b.pri);
   h+=placeLabels(labs,P.map(p=>dotBox(p,r*1.6)));
-  if(dragI>=0&&P[dragI]) h+=loupe(P[dragI],vb,upu);
+  if(dragI>=0&&P[dragI]){const s=drawing?snapFind(pts[dragI]):snapPin(pts,dragI);if(s)h+=`<circle class="st-snap" cx="${s[0]*W}" cy="${s[1]*H}" r="${r*2.2}" stroke-width="${sw*1.2}"/>`;h+=loupe(P[dragI],vb,upu)}
   $('stageOv').innerHTML=h;
 }
 function svgPt(e){const pt=svgS.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const m=svgS.getScreenCTM();if(!m)return null;const q=pt.matrixTransform(m.inverse());const ar=S.plot.ar||1;return[Math.min(1,Math.max(0,q.x/(1000*ar))),Math.min(1,Math.max(0,q.y/1000))]}
@@ -1545,11 +1707,11 @@ svgS.addEventListener('pointerdown',e=>{
     if(editPts){selI=i;pinUIx()}
     dragI=i;svgS.setPointerCapture(e.pointerId);e.preventDefault();renderStage();return;
   }
-  if(drawing){const p=svgPt(e);if(!p)return;S.plot.pts.push(p);S.plot.labels.push('');S.plot.meas.push('');renderStage();
+  if(drawing){const p0=svgPt(e);if(!p0)return;const p=snapFind(p0)||p0;S.plot.pts.push(p);S.plot.labels.push('');S.plot.meas.push('');renderStage();
     plotMsg(`วางแล้ว ${S.plot.pts.length} จุด ${S.plot.pts.length>=3?'แตะจุดแรกหรือกด “เสร็จ” เพื่อปิดกรอบ':'แตะมุมถัดไป'}`)}
 });
 svgS.addEventListener('pointermove',e=>{if(cornerI>=0){const p=svgPt(e);if(p){corners[cornerI]=p;renderStage()}return}if(dragI<0)return;const p=svgPt(e);if(!p)return;(editPts||S.plot.pts)[dragI]=p;renderStage()});
-const endDrag=()=>{cornerI=-1;if(dragI<0)return;dragI=-1;renderStage()};
+const endDrag=()=>{if(cornerI>=0){const s=snapFind(corners[cornerI]);if(s)corners[cornerI]=s}cornerI=-1;if(dragI<0){renderStage();return}const A=editPts||S.plot.pts,s=A[dragI]&&(drawing?snapFind(A[dragI]):snapPin(A,dragI));if(s)A[dragI]=s;dragI=-1;renderStage()};
 svgS.addEventListener('pointerup',endDrag);svgS.addEventListener('pointercancel',endDrag);
 
 function finishDraw(){drawing=false;$('plotDraw').setAttribute('aria-pressed','false');$('plotDraw').textContent='วาดกรอบเอง';stage.classList.remove('drawing');
@@ -1829,13 +1991,13 @@ function toolsUI(n){
   $('pinBar').hidden=!ed;
   $('plotTools').hidden=busy;
   const has=n>=3&&!drawing;
-  $('plotDetect').hidden=!(canReadImg&&hasImg&&n<3&&!drawing);
+  $('plotDetect').hidden=!(hasImg&&n<3&&!drawing);
   $('plotDraw').hidden=!(hasImg&&(n<3||drawing));
   $('plotUndo').hidden=!drawing;
   $('plotEdit').hidden=!has;
   $('plotZoom').hidden=!has;
   $('plotMore').hidden=drawing;
-  $('plotDetect2').hidden=!(canReadImg&&n>=3);
+  $('plotDetect2').hidden=!(n>=3);
   $('plotDraw2').hidden=n<3;
   $('plotClear').hidden=n<1;
   const canSave=has;
@@ -1888,7 +2050,7 @@ function commitEdit(){
 function cancelEdit(){editPts=null;selI=-1;update();plotMsg('')}
 $('pinDel').onclick=()=>{if(!editPts||selI<0)return;deletePin(selI);renderStage();pinUIx()};
 $('plotEdit').onclick=()=>{startEdit();plotMsg('')};
-$('plotDetect2').onclick=()=>{$('plotMore').open=false;readDeed('plot')};
+$('plotDetect2').onclick=()=>{$('plotMore').open=false;canReadImg?readDeed('plot'):localDetect(false)};
 $('plotDraw2').onclick=()=>{$('plotMore').open=false;$('plotDraw').click()};
 document.querySelectorAll('#plotMenu .btn').forEach(b=>b.addEventListener('click',()=>{$('plotMore').open=false}));
 document.addEventListener('click',e=>{const m=$('plotMore');if(m.open&&!m.contains(e.target))m.open=false});
@@ -1991,7 +2153,11 @@ window.__uploadFlow=async f=>{
       const ok=(S.plot.pts||[]).length>=3;
       setProg(100,ok?`จับหมุดได้ ${S.plot.pts.length} หมุด`:'อ่านเสร็จ แต่ยังจับหมุดไม่ได้');
       await sleep(700);
-    }else{setProg(100,'โหลดรูปเสร็จ');await sleep(500)}
+    }else{
+      setProg(60,'กำลังหากรอบที่ดินจากเส้นในรูป…');await sleep(30);
+      const n=await localDetect(true);
+      setProg(100,n?`จับหมุดได้ ${n} หมุด`:'โหลดรูปเสร็จ');await sleep(n?700:400);
+    }
   }catch(e){plotMsg('เปิดรูปไม่ได้ ลองถ่ายใหม่หรือเลือกรูปอื่น','err')}
   finally{
     clearInterval(upTimer);upBusy=false;$('upProg').hidden=true;update();
@@ -2409,6 +2575,7 @@ function orderCorners(c){ // TL, TR, BR, BL
 function paperFields(){$('paperW').value=S.paper.w;$('paperH').value=S.paper.h}
 ['paperW','paperH'].forEach(id=>$(id).addEventListener('input',()=>{const v=parse($(id).value);if(v>0){S.paper[id==='paperW'?'w':'h']=v;save()}}));
 $('paperSwap').onclick=()=>{S.paper={w:S.paper.h,h:S.paper.w};paperFields();save()};
+document.querySelectorAll('[data-paper]').forEach(b=>b.onclick=()=>{const [w,hh]=b.dataset.paper.split(',').map(Number);const img=$('stageImg'),land=img.naturalWidth>img.naturalHeight;S.paper=land?{w:hh,h:w}:{w,h:hh};paperFields();save()});
 function setCornerMode(on){
   cornerMode=on;$('warpPanel').hidden=!on;$('plotWarp').setAttribute('aria-pressed',on);
   $('warpAuto').hidden=!(on&&canReadImg);
@@ -2465,7 +2632,7 @@ $('warpGo').onclick=async()=>{
   setCornerMode(false);corners=[];
   await setDeedImage(url);update();
   $('warpUndo').hidden=false;
-  plotMsg(`ยืดรูปให้ตรงตามกระดาษ ${S.paper.w}×${S.paper.h} ซม. แล้ว ${S.plot.pts.length>=3?'กรอบที่ดินย้ายตามให้แล้ว เช็กหมุดอีกที':'กด “ให้ระบบหากรอบที่ดิน” ต่อได้เลย'}`,'ok');
+  plotMsg(`ยืดรูปให้ตรงตามกระดาษ ${S.paper.w}×${S.paper.h} แล้ว ${S.plot.pts.length>=3?'กรอบที่ดินย้ายตามให้แล้ว เช็กหมุดอีกที':'กด “ให้ระบบหากรอบที่ดิน” ต่อได้เลย'}`,'ok');
 };
 window.__resetWarp=()=>{editPts=null;deedOrig=null;$('warpUndo').hidden=true;if(cornerMode)setCornerMode(false);corners=[]};
 $('warpUndo').onclick=async()=>{
