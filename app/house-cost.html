@@ -800,6 +800,41 @@ body:not([data-tab="list"]) #hmTitle::after{content:"";display:inline-block;widt
 body.tb-mini .tabs{height:40px;width:min(220px,calc(100% - 140px));bottom:calc(4px + env(safe-area-inset-bottom, 0px));padding:3px!important;background:rgba(38,40,43,.92)}
 body.tb-mini .tabs button{font-size:0!important;gap:0!important}
 body.tb-mini .tabs button svg{width:18px;height:18px}
+
+/* expected appraisal card: one big number, compact rows */
+.apz{gap:10px!important}
+.apz-top h3{font-size:15px;color:var(--muted);font-weight:600}
+.apz-top h3 span{font-weight:400;opacity:.8}
+.apz .result.main{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-top:6px;padding:14px 16px;border-radius:18px}
+.apz .result.main .big{font-size:34px;line-height:1.1;white-space:nowrap}
+.apz .result .big small{font-size:15px;font-weight:600;opacity:.8}
+.apz .result .pctline{white-space:nowrap}
+.apz .result.main .pctline{justify-self:start;font-size:13px;font-weight:700;padding:2px 10px;border-radius:999px;background:rgba(255,255,255,.07)}
+.apz .result.main .lbl{flex-basis:100%;font-size:13px;color:var(--muted);opacity:1}
+.apz .result.main .lbl b{color:var(--fg);font-weight:600}
+.apz-rows{display:grid;gap:2px;margin-top:4px}
+.apz-row{display:grid;grid-template-columns:10px minmax(0,1fr) auto;grid-template-areas:"d n v" "d i v";gap:2px 10px;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line)}
+.apz-row:last-child{border-bottom:0}
+.apz-row[hidden]{display:none}
+.apz-d{grid-area:d;width:10px;height:10px;border-radius:3px;align-self:start;margin-top:7px}
+.apz-n{grid-area:n;display:flex;align-items:baseline;gap:6px;min-width:0}
+.apz-n b{font-size:15px;font-weight:600;white-space:nowrap}
+.apz-n small{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.apz-v{grid-area:v;display:grid;justify-items:end;gap:3px}
+.apz-v b{font-size:17px;font-weight:700}
+.apz-c{font-style:normal;font-size:12.5px;font-weight:700;padding:1px 8px;border-radius:999px;font-variant-numeric:tabular-nums}
+.apz-c.g{color:var(--gain);background:var(--gain-soft)}.apz-c.l{color:var(--loss);background:var(--loss-soft)}
+.apz-in{grid-area:i;justify-self:start;display:inline-flex;align-items:center;gap:2px;height:36px;padding:0 10px;border-radius:999px;background:var(--surface2);border:1px solid transparent;cursor:text}
+.apz-in:focus-within{border-color:var(--accent)}
+.apz-in input{width:6.2em;border:0;background:transparent;color:var(--accent);font:600 15px var(--display);font-variant-numeric:tabular-nums;outline:none;padding:0}
+.apz-in span:not(.sr){font-size:12.5px;color:var(--muted)}
+.apz-hint{margin:0;font-size:12.5px;color:var(--muted)}
+.apz-sale{display:grid;gap:8px;margin-top:4px;padding-top:12px;border-top:1px dashed var(--line)}
+.apz-salein{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px;font-size:15px;font-weight:600}
+.apz .result:not(.main){display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:0 10px;padding:10px 14px;border-radius:16px}
+.apz .result:not(.main) .lbl{grid-column:1/-1;font-size:13px}
+.apz .result:not(.main) .big{font-size:22px}
+.apz .result:not(.main) .pctline{font-size:13px;font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -875,39 +910,35 @@ body.tb-mini .tabs button svg{width:18px;height:18px}
         <div class="legend" id="legend"></div>
       </div>
 
-      <div class="card compare">
-        <h3>ราคาคาดการณ์</h3>
-        <label class="f">ราคาประเมินที่ดินคาดการณ์
-          <span class="inp"><input id="apprLand" inputmode="decimal" autocomplete="off"><span>บาท/ตร.วา</span></span>
-        </label>
-        <div class="gainline" id="landGain"></div>
-        <label class="f">ราคาประเมินตัวบ้านคาดการณ์
-          <span class="inp"><input id="apprBuild" inputmode="decimal" autocomplete="off"><span>บาท/ตร.ม.</span></span>
-        </label>
-        <div class="gainline" id="buildGain"></div>
-        <label class="f" id="apprGarWrap">ราคาประเมินโรงรถคาดการณ์
-          <span class="inp"><input id="apprGar" inputmode="decimal" autocomplete="off"><span>บาท/ตร.ม.</span></span>
-        </label>
-        <label class="f" id="apprGarUWrap" hidden>ราคาประเมินโรงรถใต้ชั้น 2 คาดการณ์
-          <span class="inp"><input id="apprGarU" inputmode="decimal" autocomplete="off"><span>บาท/ตร.ม.</span></span>
-        </label>
-        <div class="gainline" id="garGain"></div>
-        <label class="f">ราคาประเมินครัวคาดการณ์
-          <span class="inp"><input id="apprKit" inputmode="decimal" autocomplete="off"><span>บาท/ตร.ม.</span></span>
-        </label>
-        <div class="gainline" id="kitGain"></div>
-        <div class="result main" id="resAppr">
-          <span class="lbl" id="apprSumLbl">ราคาประเมินรวม − ต้นทุนรวม</span>
-          <span class="big num" id="diffAppr">0</span>
-          <span class="pctline" id="pctAppr"></span>
+      <div class="card compare apz">
+        <div class="apz-top">
+          <h3>ราคาประเมิน <span>คาดการณ์</span></h3>
+          <div class="result main" id="resAppr">
+            <span class="big num" id="diffAppr">0</span>
+            <span class="pctline" id="pctAppr"></span>
+            <span class="lbl" id="apprSumLbl"></span>
+          </div>
         </div>
-        <label class="f">ราคาขาย
-          <span class="inp"><input id="sale" inputmode="decimal" autocomplete="off"><span>บาท</span></span>
-        </label>
-        <div class="result" id="resSale">
-          <span class="lbl">กำไรจากราคาขาย</span>
-          <span class="big num" id="diffSale">0</span>
-          <span class="pctline" id="pctSale"></span>
+        <div class="apz-rows">
+          <div class="apz-row"><i class="apz-d" style="background:var(--c-land)"></i><div class="apz-n"><b>ที่ดิน</b><small id="apzQLand"></small></div><div class="apz-v" id="landGain"></div>
+            <label class="apz-in"><span class="sr">ราคาประเมินที่ดิน ต่อตร.วา</span><input id="apprLand" inputmode="decimal" autocomplete="off"><span>/ตร.วา</span></label></div>
+          <div class="apz-row"><i class="apz-d" style="background:var(--c-house)"></i><div class="apz-n"><b>ตัวบ้าน</b><small id="apzQHouse"></small></div><div class="apz-v" id="buildGain"></div>
+            <label class="apz-in"><span class="sr">ราคาประเมินตัวบ้าน ต่อตร.ม.</span><input id="apprBuild" inputmode="decimal" autocomplete="off"><span>/ตร.ม.</span></label></div>
+          <div class="apz-row" id="apprGarWrap"><i class="apz-d" style="background:var(--c-garage)"></i><div class="apz-n"><b>โรงรถ</b><small id="apzQGar"></small></div><div class="apz-v" id="garGain"></div>
+            <label class="apz-in"><span class="sr">ราคาประเมินโรงรถ ต่อตร.ม.</span><input id="apprGar" inputmode="decimal" autocomplete="off"><span>/ตร.ม.</span></label></div>
+          <div class="apz-row" id="apprGarUWrap" hidden><i class="apz-d" style="background:var(--c-garage)"></i><div class="apz-n"><b>โรงรถใต้ชั้น 2</b><small id="apzQGarU"></small></div><div class="apz-v" id="garGainU"></div>
+            <label class="apz-in"><span class="sr">ราคาประเมินโรงรถใต้ชั้น 2 ต่อตร.ม.</span><input id="apprGarU" inputmode="decimal" autocomplete="off"><span>/ตร.ม.</span></label></div>
+          <div class="apz-row"><i class="apz-d" style="background:var(--c-kitchen)"></i><div class="apz-n"><b>ครัว</b><small id="apzQKit"></small></div><div class="apz-v" id="kitGain"></div>
+            <label class="apz-in"><span class="sr">ราคาประเมินครัว ต่อตร.ม.</span><input id="apprKit" inputmode="decimal" autocomplete="off"><span>/ตร.ม.</span></label></div>
+        </div>
+        <p class="apz-hint">แตะราคาต่อ ตร.ม. / ตร.วา เพื่อแก้</p>
+        <div class="apz-sale">
+          <label class="apz-salein"><span>ถ้าขายได้</span><span class="inp"><input id="sale" inputmode="decimal" autocomplete="off"><span>บาท</span></span></label>
+          <div class="result" id="resSale">
+            <span class="lbl">กำไรจากราคาขาย</span>
+            <span class="big num" id="diffSale">0</span>
+            <span class="pctline" id="pctSale"></span>
+          </div>
         </div>
       </div>
 
@@ -1011,7 +1042,7 @@ const DEFAULTS={
   paper:{w:31,h:43},
   fenceSides:[], gate:4,
   layers:{img:true,frame:true,len:true,setback:true,build:true,road:true,pins:true,scale:true},
-  other:30000, sale:2200000, apprLand:12000, apprBuildRate:18000, apprGarRate:5000, apprGarURate:15000, apprKitRate:8000, gatePrice:0,
+  other:30000, sale:2200000, apprLand:15000, apprBuildRate:15000, apprGarRate:7500, apprGarURate:10000, apprKitRate:7500, gatePrice:0, apprV2:1,
   site:{side:0,w:null,face:'d',gar:'auto'},
   plan:{floors:2,bed:3,bath:2,living:1,dining:1,kitchenIn:1}
 };
@@ -1289,9 +1320,12 @@ document.querySelectorAll('[data-step] .step button').forEach(b=>{const f=b.oncl
 
 function normalize(x){
   x=(x&&x.plan)?x:structuredClone(DEFAULTS);
+  const needV2=!x.apprV2;
   for(const k in DEFAULTS){if(x[k]==null)x[k]=structuredClone(DEFAULTS[k])}
   if(x.land.price==null){x.land.price=x.land.lock?(+x.land.fixed||0):(+x.land.wa||0)*(+x.land.rate||0);delete x.land.rate;delete x.land.fixed;delete x.land.lock}
   if(x.paper&&+x.paper.w===21&&+x.paper.h===29.7)x.paper={w:31,h:43};
+  if(needV2){const old={apprLand:12000,apprBuildRate:18000,apprGarRate:5000,apprGarURate:15000,apprKitRate:8000};
+    for(const k in old)if(x[k]==null||+x[k]===old[k])x[k]=DEFAULTS[k];x.apprV2=1}
   delete x.appraisal;delete x.apprBuild;return x;
 }
 function syncInputs(){
@@ -1380,20 +1414,22 @@ function update(){
   const AP=apprParts(),apprLandTotal=AP.land, apprBuildTotal=AP.house, apprTotal=AP.total;
   const buildCost=costs.house, gl=apprLandTotal-lc, gb=apprBuildTotal-buildCost;
   const gl_=(a,b,d)=>`<span>${a} ${fmt(b)}</span><b class="${d>=0?'g':'l'}">${signed(d)}</b>`;
-  $('landGain').innerHTML=gl_(`${fmt(S.land.wa)} ตร.วา = ประเมิน ${fmt(apprLandTotal)} · ทุนที่ดิน`,lc,gl);
-  $('buildGain').innerHTML=gl_(`บ้าน ${S.house.area} ตร.ม. = ประเมิน ${fmt(apprBuildTotal)} · ทุนตัวบ้าน`,buildCost,gb);
-  const gu=garUnder();$('apprGarWrap').hidden=gu;$('apprGarUWrap').hidden=!gu;
-  $('garGain').innerHTML=S.garage.area>0?gl_(`โรงรถ${gu?'ใต้ชั้น 2':''} ${fmt1(S.garage.area)} ตร.ม. = ประเมิน ${fmt(AP.garage)} · ทุนโรงรถ`,costs.garage,AP.garage-costs.garage):'<span>ไม่มีโรงรถ</span>';
-  $('kitGain').innerHTML=S.kitchen.area>0?gl_(`ครัว ${fmt1(S.kitchen.area)} ตร.ม. = ประเมิน ${fmt(AP.kitchen)} · ทุนครัว`,costs.kitchen,AP.kitchen-costs.kitchen):'<span>ไม่มีครัว</span>';
-  $('apprSumLbl').textContent=`ราคาประเมินรวม ${fmt(apprTotal)} − ต้นทุนรวม ${fmt(total)}`;
+  const chip=d=>`<em class="apz-c ${d>=0?'g':'l'}">${signed(d)}</em>`,cell=(v,d)=>`<b class="num">${fmt(v)}</b>${chip(d)}`;
+  const gu=garUnder();$('apprGarWrap').hidden=gu||!(S.garage.area>0);$('apprGarUWrap').hidden=!gu;
+  $('apzQLand').textContent=`${fmt1(S.land.wa)} ตร.วา`;$('apzQHouse').textContent=`${fmt(S.house.area)} ตร.ม.`;
+  $('apzQGar').textContent=$('apzQGarU').textContent=`${fmt1(S.garage.area)} ตร.ม.`;$('apzQKit').textContent=`${fmt1(S.kitchen.area)} ตร.ม.`;
+  $('landGain').innerHTML=cell(apprLandTotal,gl);$('buildGain').innerHTML=cell(apprBuildTotal,gb);
+  $(gu?'garGainU':'garGain').innerHTML=cell(AP.garage,AP.garage-costs.garage);
+  $('kitGain').closest('.apz-row').hidden=!(S.kitchen.area>0);$('kitGain').innerHTML=cell(AP.kitchen,AP.kitchen-costs.kitchen);
+  $('apprSumLbl').innerHTML=`ประเมินรวม <b>${fmt(apprTotal)}</b> · ทุน <b>${fmt(total)}</b>`;
   const dA=apprTotal-total, dS=S.sale-total;
   LAST={total,diff:dA};
   const setRes=(el,d,pctEl,base)=>{
     el.classList.toggle('gain',d>=0);el.classList.toggle('loss',d<0);
-    pctEl.textContent=total?`${d>=0?'บวก':'ขาด'} ${(Math.abs(d)/total*100).toFixed(1)}% ของต้นทุน`:'';
+    pctEl.textContent=total?`${d>=0?'บวก':'ขาด'} ${(Math.abs(d)/total*100).toFixed(1)}%`:'';
   };
-  $('diffAppr').textContent=signed(dA)+' บาท';setRes($('resAppr'),dA,$('pctAppr'));
-  $('diffSale').textContent=signed(dS)+' บาท';setRes($('resSale'),dS,$('pctSale'));
+  $('diffAppr').innerHTML=signed(dA)+'<small> บาท</small>';setRes($('resAppr'),dA,$('pctAppr'));
+  $('diffSale').innerHTML=signed(dS)+'<small> บาท</small>';setRes($('resSale'),dS,$('pctSale'));
   $('sTotal').textContent=fmt(total);$('sDiff').textContent=signed(dA);
   $('sDiff').style.color=dA>=0?'var(--gain)':'var(--loss)';
 
