@@ -739,6 +739,13 @@ body.sh-open{overflow:hidden}
 #stageOv .st-loupe-ring{stroke:var(--ink)}
 #card-plot.lay-off-frame .st-case{display:none}
 #card-plot.lay-off-build .st-case-b{display:none}
+
+/* rename */
+body:not([data-tab="list"]) #hmTitle{cursor:pointer}
+body:not([data-tab="list"]) #hmTitle::after{content:"";display:inline-block;width:15px;height:15px;margin-left:6px;vertical-align:1px;opacity:.55;
+  background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h4L19 9l-4-4L4 16z'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h4L19 9l-4-4L4 16z'/%3E%3C/svg%3E") center/contain no-repeat}
+#nmSheet .inp{min-height:52px}
+#nmSheet .inp input{font-size:18px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -912,6 +919,14 @@ body.sh-open{overflow:hidden}
   <p class="sh-msg" id="rcWarn" hidden></p>
   <button class="btn primary sh-wide" id="rcSave" type="button">บันทึกไว้ในเครื่องนี้</button>
   <button class="btn sh-wide" id="rcSkip" type="button">ไม่ใช่ตอนนี้</button>
+</div>
+<div class="sh" id="nmSheet" role="dialog" aria-modal="true" aria-labelledby="nmT" hidden>
+  <span class="sh-grab" aria-hidden="true"></span>
+  <h3 id="nmT">ตั้งชื่อบ้านหลังนี้</h3>
+  <p class="sh-d" id="nmD">ตั้งชื่อให้จำง่าย เช่น ชื่อหมู่บ้าน ซอย หรือเลขแปลง</p>
+  <span class="inp"><input id="nmInput" autocomplete="off" maxlength="80" placeholder="เช่น บ้านแปลงหน้าวัด" aria-label="ชื่อบ้าน"></span>
+  <button class="btn primary sh-wide" id="nmOk" type="button">เริ่มเลย</button>
+  <button class="btn sh-wide" id="nmSkip" type="button">ข้ามไปก่อน</button>
 </div>
 <input type="file" id="shImport" accept=".json,application/json" hidden>
 <button class="strip" id="strip" type="button" aria-controls="sheet" aria-expanded="false">
@@ -1555,6 +1570,46 @@ function cvParcel(){
   const cx=best.reduce((a,p)=>a+p[0],0)/best.length,cy=best.reduce((a,p)=>a+p[1],0)/best.length;
   return best.map(([x,y])=>{const dx=x-cx,dy=y-cy,L=Math.hypot(dx,dy)||1;return[(x+dx/L*2+.5)/W,(y+dy/L*2+.5)/H]});
 }
+
+function cvPaperQuad(){
+  // the deed sheet is the big bright area; its outline simplified to 4 corners
+  const img=$('stageImg');if(!img||!img.naturalWidth)return null;
+  const G=cvGray(img,500),{g,W,H}=G,N=W*H;
+  const hist=new Float64Array(256);for(let i=0;i<N;i++)hist[Math.max(0,Math.min(255,g[i]|0))]++;
+  let sum=0;for(let t=0;t<256;t++)sum+=t*hist[t];let sb=0,wb=0,best=0,th=128;
+  for(let t=0;t<256;t++){wb+=hist[t];if(!wb)continue;const wf=N-wb;if(!wf)break;sb+=t*hist[t];const mb=sb/wb,mf=(sum-sb)/wf,v=wb*wf*(mb-mf)*(mb-mf);if(v>best){best=v;th=t}}
+  // blur a little so text on the sheet does not cut it apart
+  const I=cvIntegral(g,W,H),br=new Uint8Array(N),r=Math.max(2,Math.round(Math.min(W,H)/80));
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(cvBox(I,W,H,x,y,r)>th)br[y*W+x]=1;
+  const lab=new Int32Array(N).fill(-1),st=new Int32Array(N);let bestId=-1,bestA=0;
+  for(let s=0;s<N;s++){if(!br[s]||lab[s]>=0)continue;let sp=0,a=0;st[sp++]=s;lab[s]=s;
+    while(sp){const i=st[--sp],x=i%W;a++;
+      if(x>0&&br[i-1]&&lab[i-1]<0){lab[i-1]=s;st[sp++]=i-1}if(x<W-1&&br[i+1]&&lab[i+1]<0){lab[i+1]=s;st[sp++]=i+1}
+      if(i>=W&&br[i-W]&&lab[i-W]<0){lab[i-W]=s;st[sp++]=i-W}if(i<N-W&&br[i+W]&&lab[i+W]<0){lab[i+W]=s;st[sp++]=i+W}}
+    if(a>bestA){bestA=a;bestId=s}}
+  if(bestA<N*.2)return null;
+  const P=[];for(let y=0;y<H;y++){let lo=-1,hi=-1;for(let x=0;x<W;x++)if(lab[y*W+x]===bestId){if(lo<0)lo=x;hi=x}if(lo>=0){P.push([lo,y]);P.push([hi+1,y])}}
+  let Q=cvHull(P);const A=cvArea(Q);
+  if(A>N*.93)return null; // already cropped to the sheet
+  while(Q.length>4){let mi=-1,mv=Infinity;
+    for(let i=0;i<Q.length;i++){const a=Q[(i-1+Q.length)%Q.length],b=Q[i],c=Q[(i+1)%Q.length];const t=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]));if(t<mv){mv=t;mi=i}}
+    Q.splice(mi,1)}
+  if(Q.length!==4||cvArea(Q)<A*.9)return null;
+  const C=orderCorners(Q.map(([x,y])=>[x/W,y/H]));
+  // sanity: sides look like a sheet of paper
+  const d=(a,b)=>Math.hypot((a[0]-b[0])*W,(a[1]-b[1])*H),w1=d(C[0],C[1]),w2=d(C[3],C[2]),h1=d(C[0],C[3]),h2=d(C[1],C[2]);
+  if(Math.min(w1,w2)/Math.max(w1,w2)<.6||Math.min(h1,h2)/Math.max(h1,h2)<.6)return null;
+  const ar=(w1+w2)/(h1+h2);if(ar<.45||ar>2.2)return null;
+  return {C,landscape:ar>1};
+}
+async function autoFlatten(){
+  let q=null;try{q=cvPaperQuad()}catch(e){q=null}
+  if(!q)return false;
+  const a=Math.min(+S.paper.w||31,+S.paper.h||43),b=Math.max(+S.paper.w||31,+S.paper.h||43);
+  S.paper=q.landscape?{w:b,h:a}:{w:a,h:b};
+  corners=q.C;
+  try{return await doWarp(true)}catch(e){return false}
+}
 async function localDetect(fromUpload){
   let Q=null;try{Q=cvParcel()}catch(e){Q=null}
   if(!Q||Q.length<3){if(!fromUpload)plotMsg('หากรอบที่ดินในรูปไม่เจอ กด “วาดกรอบเอง” แล้วแตะมุมที่ดินทีละจุด ระบบจะดูดหมุดเข้าหามุมเส้นให้','err');return 0}
@@ -2151,12 +2206,15 @@ window.__uploadFlow=async f=>{
     c.getContext('2d').drawImage(img,0,0,c.width,c.height);
     const url=c.toDataURL('image/jpeg',0.85);
     window.__resetWarp&&window.__resetWarp();
-    S.plot={ar:c.width/c.height,pts:[],labels:[],meas:[],sides:[]};S.fenceSides=[];
+    S.plot={ar:c.width/c.height,pts:[],labels:[],meas:[],sides:[]};S.fenceSides=[];corners=[];
     vmode='deed';zoomPlot=true;VIEW.stage={z:1,ox:0,oy:0};VIEW.plan={z:1,ox:0,oy:0};hiSide=-1;openSide=-1;
     deedBlob=dataUrlToBlob(url);showDeed(url);
     try{localStorage.setItem(DEED_KEY,url)}catch(e){}
     update();
-    setProg(50,'โหลดรูปเสร็จ');
+    await imgReady($('stageImg'),url);
+    setProg(42,'กำลังปรับกระดาษให้ตรงตามขนาด 31 × 43…');await sleep(30);
+    const flat=await autoFlatten();
+    setProg(50,flat?'ปรับกระดาษให้ตรงแล้ว':'โหลดรูปเสร็จ');
     await Promise.race([sampleReady,sleep(4000)]);
     if(canReadImg){
       setProg(55,'กำลังอ่านโฉนดและจับหมุด… ใช้เวลาประมาณครึ่งนาที');
@@ -2611,20 +2669,22 @@ $('warpAuto').onclick=async()=>{
   }catch(e){plotMsg(e&&e.code==='rate_limited'?'ใช้งานถี่ไป รอสักครู่':'หามุมไม่สำเร็จ ลากจุดเองได้เลย','err')}
   finally{b.disabled=false}
 };
+function imgReady(img,url){return new Promise(r=>{if(img.complete&&img.naturalWidth&&img.getAttribute('src')===url)return r();const t=setTimeout(r,3000);img.addEventListener('load',()=>{clearTimeout(t);r()},{once:true})})}
 async function setDeedImage(url){
   deedBlob=dataUrlToBlob(url);showDeed(url);
   try{localStorage.setItem(DEED_KEY,url)}catch(e){}
 }
-$('warpGo').onclick=async()=>{
-  const img=$('stageImg'),iw=img.naturalWidth,ih=img.naturalHeight;if(!iw)return;
-  const pw=+S.paper.w,ph=+S.paper.h;if(!(pw>0&&ph>0)){plotMsg('ใส่ขนาดกระดาษก่อน','err');return}
+$('warpGo').onclick=()=>doWarp(false);
+async function doWarp(quiet){
+  const img=$('stageImg'),iw=img.naturalWidth,ih=img.naturalHeight;if(!iw)return false;
+  const pw=+S.paper.w,ph=+S.paper.h;if(!(pw>0&&ph>0)){plotMsg('ใส่ขนาดกระดาษก่อน','err');return false}
   const C=corners.map(([x,y])=>[x*iw,y*ih]);
   const e=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
   const longest=Math.max(e(C[0],C[1]),e(C[3],C[2]),e(C[0],C[3]),e(C[1],C[2]));
   let OW,OH;if(pw>=ph){OW=Math.min(1800,Math.round(longest));OH=Math.round(OW*ph/pw)}else{OH=Math.min(1800,Math.round(longest));OW=Math.round(OH*pw/ph)}
   const R=[[0,0],[OW,0],[OW,OH],[0,OH]];
   const Hinv=solveH(R,C), Hfwd=solveH(C,R);
-  plotMsg('กำลังยืดรูป…');await new Promise(r=>setTimeout(r,20));
+  if(!quiet)plotMsg('กำลังยืดรูป…');await new Promise(r=>setTimeout(r,20));
   const sc=document.createElement('canvas');sc.width=iw;sc.height=ih;const sx=sc.getContext('2d');sx.drawImage(img,0,0);
   const sd=sx.getImageData(0,0,iw,ih).data;
   const oc=document.createElement('canvas');oc.width=OW;oc.height=OH;const ox=oc.getContext('2d');const od=ox.createImageData(OW,OH);const o=od.data;
@@ -2643,10 +2703,11 @@ $('warpGo').onclick=async()=>{
   S.plot.pts=(S.plot.pts||[]).map(([x,y])=>{const [u,v]=applyH(Hfwd,[x*iw,y*ih]);return[Math.min(1,Math.max(0,u/OW)),Math.min(1,Math.max(0,v/OH))]});
   S.plot.ar=OW/OH;
   setCornerMode(false);corners=[];
-  await setDeedImage(url);update();
+  await setDeedImage(url);await imgReady($('stageImg'),url);update();
   $('warpUndo').hidden=false;
-  plotMsg(`ยืดรูปให้ตรงตามกระดาษ ${S.paper.w}×${S.paper.h} แล้ว ${S.plot.pts.length>=3?'กรอบที่ดินย้ายตามให้แล้ว เช็กหมุดอีกที':'กด “ให้ระบบหากรอบที่ดิน” ต่อได้เลย'}`,'ok');
-};
+  if(!quiet)plotMsg(`ยืดรูปให้ตรงตามกระดาษ ${S.paper.w}×${S.paper.h} แล้ว ${S.plot.pts.length>=3?'กรอบที่ดินย้ายตามให้แล้ว เช็กหมุดอีกที':'กด “ให้ระบบหากรอบที่ดิน” ต่อได้เลย'}`,'ok');
+  return true;
+}
 window.__resetWarp=()=>{editPts=null;deedOrig=null;$('warpUndo').hidden=true;if(cornerMode)setCornerMode(false);corners=[]};
 $('warpUndo').onclick=async()=>{
   if(!deedOrig)return;S.plot=deedOrig.plot;await setDeedImage(deedOrig.url);deedOrig=null;$('warpUndo').hidden=true;update();plotMsg('กลับเป็นรูปก่อนดัดแล้ว');
@@ -2886,7 +2947,7 @@ function renderHead(){
 }
 window.__renderHead=renderHead;
 $('hmBack').onclick=()=>setTab('list',true);
-const startNew=()=>{$('projNew').click();setTab('land',true)};
+const startNew=()=>{$('projNew').click();setTab('land',true);setTimeout(()=>window.__askName&&window.__askName(true),60)};
 $('hmAdd').onclick=startNew;$('hmAdd2').onclick=startNew;
 $('projName').addEventListener('input',renderHead);
 const PIE=[['land','ที่ดิน','--c-land'],['house','ตัวบ้าน','--c-house'],['garage','โรงรถ','--c-garage'],['kitchen','ครัว','--c-kitchen'],['fence','รั้ว','--c-fence'],['other','อื่นๆ','--c-other']];
@@ -2969,7 +3030,7 @@ const shareName=()=>$('projName').value.trim()||('บ้าน '+fmt1(S.land.wa)
 const fileSafe=s=>s.replace(/[\\/:*?"<>|]+/g,'').slice(0,60)||'บ้าน';
 let shLast=null;
 function openSh(el){shLast=document.activeElement;$('shScrim').hidden=false;el.hidden=false;document.body.classList.add('sh-open');setTimeout(()=>{const f=el.querySelector('button:not([hidden])');f&&f.focus()},30)}
-function closeSh(){['shSheet','rcSheet'].forEach(i=>$(i).hidden=true);$('shScrim').hidden=true;document.body.classList.remove('sh-open');shLast&&shLast.focus&&shLast.focus()}
+function closeSh(){['shSheet','rcSheet','nmSheet'].forEach(i=>$(i).hidden=true);$('shScrim').hidden=true;document.body.classList.remove('sh-open');shLast&&shLast.focus&&shLast.focus()}
 const shSay=(t,c)=>{$('shMsg').textContent=t;$('shMsg').className='sh-msg'+(c?' '+c:'')};
 $('hmShare').onclick=()=>{shSay('');$('shUrlBox').hidden=true;$('shLink').hidden=inClaude&&!/^https?:$/.test(location.protocol)?true:false;openSh($('shSheet'))};
 $('shClose').onclick=closeSh;$('shScrim').onclick=closeSh;
@@ -3023,6 +3084,24 @@ async function readHash(){
 window.addEventListener('hashchange',readHash);
 setTimeout(readHash,0);
 sampleReady.then(()=>{if(!canReadImg){const d=document.querySelector('#chUpload .cd');if(d)d.textContent='เลือกรูปโฉนด แล้วแตะมุมที่ดินบนรูปทีละจุด'}});
+
+// ---------- name / rename ----------
+let nmNew=false;
+window.__askName=isNew=>{
+  nmNew=!!isNew;$('nmT').textContent=isNew?'ตั้งชื่อบ้านหลังนี้':'เปลี่ยนชื่อบ้าน';
+  $('nmOk').textContent=isNew?'เริ่มเลย':'บันทึกชื่อ';$('nmSkip').textContent=isNew?'ข้ามไปก่อน':'ยกเลิก';
+  $('nmInput').value=$('projName').value.trim();openSh($('nmSheet'));setTimeout(()=>{$('nmInput').focus();$('nmInput').select()},80);
+};
+$('nmOk').onclick=async()=>{
+  const v=$('nmInput').value.trim();closeSh();if(!v)return;
+  $('projName').value=v;$('projName').dispatchEvent(new Event('input'));renderHead();
+  if(cur.id&&!nmNew)await doSave(false);
+};
+$('nmSkip').onclick=closeSh;
+$('nmInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('nmOk').click()}});
+$('hmTitle').setAttribute('role','button');$('hmTitle').tabIndex=0;$('hmTitle').title='แตะเพื่อเปลี่ยนชื่อ';
+$('hmTitle').addEventListener('click',()=>{if(document.body.dataset.tab!=='list')window.__askName(false)});
+$('hmTitle').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&document.body.dataset.tab!=='list'){e.preventDefault();window.__askName(false)}});
 
 // the projects card sits below the summary in the overview
 document.querySelector('.wrap').insertBefore(document.querySelector('section.projects'),document.querySelector('section.planner'));
