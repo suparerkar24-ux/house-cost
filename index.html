@@ -759,6 +759,8 @@ body:not([data-tab="list"]) #hmTitle::after{content:"";display:inline-block;widt
 .gar-under .hint{display:block;font-size:13px;color:var(--muted);font-weight:400}
 
 /* PDF report (rendered off screen, light paper look) */
+.choice .tip{margin-top:6px;font-size:13px;color:var(--lock)}
+.up-tip{margin:8px 0 0;font-size:13px;color:var(--lock)}
 .hm-pdf{width:100%;min-height:52px!important;margin-top:4px;gap:8px;font-size:16px!important}
 .pdfhost{position:fixed;left:-12000px;top:0;z-index:-1}
 .pdfpage{width:794px;height:1123px;overflow:hidden;background:#fff;color:#16181a;font-family:var(--body);font-size:14px;line-height:1.45;padding:44px 48px;box-sizing:border-box;
@@ -1090,7 +1092,7 @@ inputsEl.insertAdjacentHTML('beforeend',`
   <div class="choose" id="plotChoose">
     <p class="qlabel">จะทำผังที่ดินด้วยวิธีไหน?</p>
     <div class="choose-grid">
-      <button type="button" class="choice" id="chUpload"><span class="ct">อัปโหลดรูปโฉนด</span><span class="cd">ระบบอ่านขนาดและจับหมุดให้อัตโนมัติ</span></button>
+      <button type="button" class="choice" id="chUpload"><span class="ct">อัปโหลดรูปโฉนด</span><span class="cd">ระบบอ่านขนาดและจับหมุดให้อัตโนมัติ</span><span class="cd tip">📷 ถ่ายตรงจากด้านบน ให้กระดาษวางราบ ไม่เอียง และเห็นเต็มใบ</span></button>
       <button type="button" class="choice" id="chManual"><span class="ct">วัดเอง</span><span class="cd">ใส่หน้ากว้างกับความลึกของที่ดิน</span></button>
     </div>
   </div>
@@ -2290,9 +2292,7 @@ window.__uploadFlow=async f=>{
     try{localStorage.setItem(DEED_KEY,url)}catch(e){}
     update();
     await imgReady($('stageImg'),url);
-    setProg(42,'กำลังปรับกระดาษให้ตรงตามขนาด 31 × 43…');await sleep(30);
-    const flat=await autoFlatten();
-    setProg(50,flat?'ปรับกระดาษให้ตรงแล้ว':'โหลดรูปเสร็จ');
+    setProg(50,'โหลดรูปเสร็จ');
     await Promise.race([sampleReady,sleep(4000)]);
     if(canReadImg){
       setProg(55,'กำลังอ่านโฉนดและจับหมุด… ใช้เวลาประมาณครึ่งนาที');
@@ -3170,7 +3170,7 @@ async function readHash(){
 }
 window.addEventListener('hashchange',readHash);
 setTimeout(readHash,0);
-sampleReady.then(()=>{if(!canReadImg){const d=document.querySelector('#chUpload .cd');if(d)d.textContent='เลือกรูปโฉนด แล้วแตะมุมที่ดินบนรูปทีละจุด'}});
+sampleReady.then(()=>{if(!canReadImg){const d=document.querySelector('#chUpload .cd');if(d)d.textContent='ระบบหาหมุดจากเส้นในรูปให้ แก้เองได้'}});
 
 // garage under the upper floor
 (function(){const c=$('card-garage');if(!c)return;const f=c.querySelector('.foot');
