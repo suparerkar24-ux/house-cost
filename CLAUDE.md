@@ -8,7 +8,7 @@
 To ship a change:
 1. Edit `app/house-cost.html`.
 2. Publish it to the artifact URL above (Artifact tool, `url` = the artifact link, same file).
-3. `python3 tools/build_web.py`, bump `APP_VER` in the source if present, commit, push to `main`.
+3. `python3 tools/build_web.py`, bump `APP_VER` in the source if present, commit, push to `root` (the default branch).
    Pages redeploys in about a minute.
 
 Notes: outside Claude, `window.claude` is missing, so AI deed reading is off (user taps corners) and
